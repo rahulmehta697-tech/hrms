@@ -1,0 +1,33 @@
+{
+  "name": "institute-hrms",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "node scripts/migrate.mjs && next build",
+    "start": "next start",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node scripts/migrate.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "bcryptjs": "3.0.2",
+    "drizzle-orm": "0.44.7",
+    "exceljs": "4.4.0",
+    "jspdf": "3.0.3",
+    "jspdf-autotable": "5.0.2",
+    "next": "15.5.27",
+    "pg": "8.16.3",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.18.0",
+    "@types/pg": "8.15.5",
+    "@types/react": "19.1.12",
+    "@types/react-dom": "19.1.9",
+    "drizzle-kit": "0.31.4",
+    "typescript": "5.9.2"
+  }
+}
