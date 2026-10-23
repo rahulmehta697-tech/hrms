@@ -13,7 +13,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   const emp = await getEmployee(u.employeeId);
   if (!emp) {
     if (sp.err || sp.ok) return <><Head title={`Welcome, ${u.name}`} /><Flash sp={sp} /></>;
-    redirect(u.role === "admin" ? "/admin/institute" : (await can(u, "reports")) ? "/hr" : "/profile");
+    redirect(u.role === "admin" ? "/admin" : (await can(u, "reports")) ? "/hr" : "/profile");
   }
   const { org } = await getSettings();
   const today = nowIn(org.tz).date, m = today.slice(0, 7);

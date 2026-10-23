@@ -4,6 +4,7 @@ import { requirePerm } from "@/lib/auth";
 import { activeList, getSettings } from "@/lib/settings";
 import { barFor } from "@/lib/datasets";
 import { fdt, inr, monthLabel, nowIn } from "@/lib/dates";
+import { salaryRules } from "@/lib/logic";
 import { addPayInput, deletePayInput, payrollAction } from "@/app/actions/hr";
 import DataBar from "@/components/DataBar";
 import { Flash, Head, Ico, Stat } from "@/components/ui";
@@ -20,7 +21,8 @@ export default async function Payroll({ searchParams }: { searchParams: Promise<
   const lines = await db().select({ l: schema.payrollLines, e: schema.employees }).from(schema.payrollLines).leftJoin(schema.employees, eq(schema.employees.id, schema.payrollLines.employeeId)).where(eq(schema.payrollLines.month, m)).orderBy(asc(schema.payrollLines.employeeId));
   const inputs = await db().select({ i: schema.payInputs, n: schema.employees.name }).from(schema.payInputs).leftJoin(schema.employees, eq(schema.employees.id, schema.payInputs.employeeId)).where(eq(schema.payInputs.month, m));
   const tot = (f: (d: (typeof lines)[number]["l"]["data"]) => number) => lines.reduce((s, x) => s + f(x.l.data), 0);
-  const sumD = (n: string) => tot((d) => d.deductions.find((x) => x[0] === n)?.[1] || 0);
+  const { rule } = await salaryRules();
+  const sumD = (r: string) => tot((d) => d.deductions.filter((x) => rule[x[0]] === r).reduce((s, x) => s + x[1], 0));
   const noBank = lines.filter((x) => !x.e?.bankAccount).length;
   const lop = lines.filter((x) => x.l.data.lop > 0).length;
   const withStruct = Number((await db().selectDistinct({ e: schema.salaryStructure.employeeId }).from(schema.salaryStructure)).length);
@@ -51,10 +53,10 @@ export default async function Payroll({ searchParams }: { searchParams: Promise<
             <div><span>No bank account on record</span><span className={"pill " + (noBank ? "p-bad" : "p-ok")}>{noBank}</span></div>
             <div><span>Variable inputs this month</span><span className="pill p-info">{inputs.length}</span></div></div></div>
           <div className="card"><h2>Statutory</h2><div className="list">
-            <div><span>Provident fund (employee)</span><span className="num">{inr(sumD("Provident fund"))}</span></div>
-            <div><span>ESI (employee)</span><span className="num">{inr(sumD("ESI"))}</span></div>
+            <div><span>Provident fund (employee)</span><span className="num">{inr(sumD("Auto: employee PF"))}</span></div>
+            <div><span>ESI (employee)</span><span className="num">{inr(sumD("Auto: employee ESI"))}</span></div>
             <div><span>Income tax (TDS)</span><span className="num">{inr(sumD("Income tax (TDS)"))}</span></div>
-            <div><span>Employer PF + ESI</span><span className="num">{inr(tot((d) => d.employer.reduce((s, x) => s + x[1], 0)))}</span></div></div></div>
+            <div><span>Employer contributions</span><span className="num">{inr(tot((d) => d.employer.reduce((s, x) => s + x[1], 0)))}</span></div></div></div>
         </div>
       </>}
       <div className="card"><div className="row between" style={{ marginBottom: 12 }}><div><h2>Variable inputs</h2><p className="hint" style={{ margin: "4px 0 0" }}>Arrears, allowances, one-off deductions, and “LOP days” for loss of pay. Recompute after changes.</p></div><DataBar ds="pay-inputs" params={`m=${m}`} importLabel="payroll inputs" canImport={inBar.canImport && step < 2} canExport={inBar.canExport} /></div>

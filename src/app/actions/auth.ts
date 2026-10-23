@@ -4,9 +4,10 @@ import { eq, sql } from "drizzle-orm";
 import { timingSafeEqual } from "crypto";
 import { db, schema } from "@/db";
 import { getSettings, isSetUp } from "@/lib/settings";
-import { DEFAULTS, MASTERS } from "@/lib/config";
+import { DEFAULTS } from "@/lib/config";
 import { checkPassword, endSession, getUser, hashPassword, normLogin, pwError, startSession, who } from "@/lib/auth";
 import { log } from "@/lib/audit";
+import { licenceStatus } from "@/lib/license";
 
 const q = (path: string, k: "ok" | "err", m: string, extra = "") => `${path}?${k}=${encodeURIComponent(m)}${extra}`;
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
@@ -27,6 +28,7 @@ export async function login(fd: FormData) {
     if (locked) await log("System", `Locked login ${u.login} after ${failed} wrong passwords`);
     back(locked ? `Wrong password. The login is now locked after ${pol.lock} attempts. Ask the Master Admin to unlock it.` : `Wrong password. ${pol.lock - failed} attempt${pol.lock - failed > 1 ? "s" : ""} left before the login locks.`);
   }
+  if (u.role !== "admin" && (await licenceStatus()).state === "expired") back("This portal's licence has expired. Please contact your HR office; the Master Admin can still sign in to renew it.");
   await db().update(schema.users).set({ failed: 0, lastLogin: new Date() }).where(eq(schema.users.id, u.id));
   await startSession(u.id, pol.session);
   await log(who(u), "Signed in");
@@ -84,13 +86,11 @@ export async function runSetup(fd: FormData) {
     const hasSettings = await tx.select({ n: sql<number>`count(*)` }).from(schema.settings);
     fresh = Number(hasSettings[0].n) === 0;
     if (fresh) for (const [k, v] of Object.entries({ ...DEFAULTS, org, rules: { ...DEFAULTS.rules, start: new Date().toISOString().slice(0, 10) } })) await tx.insert(schema.settings).values({ key: k, value: v }).onConflictDoNothing();
-    const existing = await tx.select({ n: sql<number>`count(*)` }).from(schema.masters);
-    if (Number(existing[0].n) === 0) for (const m of MASTERS) if (m.seed.length) await tx.insert(schema.masters).values(m.seed.map((d, i) => ({ kind: m.kind, data: d, sort: i })));
     await tx.delete(schema.users).where(eq(schema.users.login, "ADMIN"));
     await tx.insert(schema.users).values({ login: "ADMIN", name: "Master Admin", role: "admin", passwordHash: hash, mustChange: false, status: "Active" });
   });
   const u = (await db().select().from(schema.users).where(eq(schema.users.login, "ADMIN")).limit(1))[0];
   await log("Master Admin (ADMIN)", fresh ? "Completed first-run setup" : "Recreated the Master Admin login from the setup page");
   await startSession(u.id, DEFAULTS.pol.session);
-  redirect(q("/admin/institute", "ok", "Setup complete. You are signed in as Master Admin (login ID: admin)."));
+  redirect(q("/admin", "ok", "Setup complete. You are signed in as Master Admin (login ID: admin)."));
 }

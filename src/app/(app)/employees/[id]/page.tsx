@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requirePerm, can } from "@/lib/auth";
 import { activeList, activeRows, getSettings } from "@/lib/settings";
-import { balances, getEmployee } from "@/lib/logic";
+import { balances, getEmployee, salaryRules } from "@/lib/logic";
 import { fdt, inr } from "@/lib/dates";
 import { setSalary } from "@/app/actions/hr";
 import EmpForm from "@/components/EmpForm";
@@ -21,7 +21,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
   const pay = await can(u, "payroll");
   const sal = pay ? await db().select().from(schema.salaryStructure).where(eq(schema.salaryStructure.employeeId, e.id)) : [];
   const comps = await activeRows("sal");
-  const kind = Object.fromEntries(comps.map((c) => [String(c.data[0]), String(c.data[1])]));
+  const { kind, rule } = await salaryRules();
   const bal = await balances(e.id, e.category);
   return (
     <>
@@ -33,8 +33,8 @@ export default async function EmployeePage({ params, searchParams }: { params: P
       </div>
       <EmpForm e={e} opts={opts} isNew={false} prefix={org.prefix} />
       {pay && <div className="card" id="salary"><h2>Salary structure (monthly)</h2>
-        <p className="hint" style={{ margin: "-6px 0 12px" }}>Full-month amounts. Provident fund, ESI and Employer PF are calculated automatically when added (enter 1 as the amount). Set an amount to 0 to remove a line.</p>
-        {sal.length ? <div className="tw"><table style={{ minWidth: 400 }}><thead><tr><th>Component</th><th>Type</th><th className="r">Monthly amount</th></tr></thead><tbody>{sal.map((x) => <tr key={x.component}><td>{x.component}</td><td className="muted">{kind[x.component] || "Not in master"}</td><td className="r num">{["Provident fund", "ESI", "Employer PF"].includes(x.component) ? "Auto" : inr(Number(x.amount))}</td></tr>)}</tbody></table></div> : <div className="empty">No salary structure yet.</div>}
+        <p className="hint" style={{ margin: "-6px 0 12px" }}>Full-month amounts. Components whose rule is “Auto” (PF, ESI) are calculated by payroll; enter 1 as their amount to switch them on. Set an amount to 0 to remove a line.</p>
+        {sal.length ? <div className="tw"><table style={{ minWidth: 400 }}><thead><tr><th>Component</th><th>Type</th><th className="r">Monthly amount</th></tr></thead><tbody>{sal.map((x) => <tr key={x.component}><td>{x.component}</td><td className="muted">{kind[x.component] || "Not in master"}</td><td className="r num">{rule[x.component]?.startsWith("Auto") ? "Auto" : inr(Number(x.amount))}</td></tr>)}</tbody></table></div> : <div className="empty">No salary structure yet.</div>}
         <form action={setSalary} className="row" style={{ marginTop: 12, alignItems: "end" }}>
           <input type="hidden" name="id" value={e.id} />
           <div className="fld" style={{ flex: "1 1 220px" }}><label htmlFor="component">Component</label><select id="component" name="component">{comps.map((c) => <option key={c.id}>{String(c.data[0])}</option>)}</select></div>

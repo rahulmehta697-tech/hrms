@@ -46,7 +46,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ ds: str
   const good = rows.filter((r) => !r.err).map((r) => r.o);
   if (commit) {
     if (missing.length || !good.length) return deny("Nothing to import.", 400);
-    const message = await im.commit(good, prep, ctx);
+    let message: string;
+    try { message = await im.commit(good, prep, ctx); }
+    catch (e) { return deny((e as Error).message || "Import failed.", 400); }
     await log(who(u), `Imported ${good.length} rows into ${ds.title(ctx)} from “${file.name}”`);
     return NextResponse.json({ done: true, message });
   }

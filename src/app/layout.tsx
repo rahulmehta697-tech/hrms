@@ -1,10 +1,11 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import { getSettings } from "@/lib/settings";
+import { PRODUCT } from "@/lib/product";
 
 export async function generateMetadata(): Promise<Metadata> {
-  try { const { org } = await getSettings(); return { title: `${org.short || org.name} HRMS`, robots: { index: false, follow: false } }; }
-  catch { return { title: "HRMS" }; }
+  try { const { org } = await getSettings(); return { title: `${org.short || org.name} · ${PRODUCT.name}`, robots: { index: false, follow: false } }; }
+  catch { return { title: PRODUCT.name }; }
 }
 export const viewport: Viewport = { width: "device-width", initialScale: 1 };
 

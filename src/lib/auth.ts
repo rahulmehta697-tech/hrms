@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createHash, randomBytes, randomInt } from "crypto";
 import bcrypt from "bcryptjs";
@@ -44,7 +44,10 @@ export async function startSession(userId: number, hours: number) {
   const expiresAt = new Date(Date.now() + hours * 3600_000);
   await db().insert(schema.sessions).values({ id: sha(token), userId, expiresAt });
   await db().delete(schema.sessions).where(lt(schema.sessions.expiresAt, new Date()));
-  (await cookies()).set(COOKIE, token, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", expires: expiresAt });
+  // Secure cookies need HTTPS; on-premise installs reached over plain http on the local network still work.
+  const h = await headers();
+  const https = (h.get("x-forwarded-proto") || "").split(",")[0].trim() === "https" || process.env.FORCE_SECURE_COOKIE === "1";
+  (await cookies()).set(COOKIE, token, { httpOnly: true, secure: https, sameSite: "lax", path: "/", expires: expiresAt });
 }
 export async function endSession() {
   const c = await cookies();

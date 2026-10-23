@@ -6,6 +6,7 @@ import { MASTERS, STAGES, EMP_STATUS, ROLES, type Perm, type Role } from "./conf
 import { attendanceGrid, leaveCounter, summarise } from "./logic";
 import { daysInMonth, fd, fdt, isDate, isTime, monthLabel, nowIn, MONTHS, pad } from "./dates";
 import type { SessionUser } from "./auth";
+import { employeeRoom } from "./license";
 
 type Cell = string | number;
 export type Ctx = { u: SessionUser; p: URLSearchParams; prefix: string; tz: string };
@@ -79,6 +80,9 @@ export const DATASETS: Record<string, DataSet> = {
           vals.set(id, { id, name: S(o["Full name"]), designation: ci(p.desig, o["Designation"])!, department: ci(p.dept, o["Department"])!, category: ci(p.cat, o["Category"])!, doj: S(o["Date of joining"]) || null, status: ci(EMP_STATUS, o["Status"]) || "Active", shift: ci(p.shift, o["Shift"]) || null, mobile: S(o["Mobile"]) || null, email: S(o["Email"]) || null, pan: S(o["PAN"]) || null, uan: S(o["UAN"]) || null, bankAccount: S(o["Bank account"]) || null, ifsc: S(o["IFSC"]).toUpperCase() || null });
         }
         const all = [...vals.values()];
+        const newActive = all.filter((v) => !existing.has(v.id) && v.status !== "Exited").length;
+        const room = newActive ? await employeeRoom(newActive) : "";
+        if (room) throw new Error(room);
         const ex = (c: string) => sql.raw(`excluded.${c}`);
         for (let i = 0; i < all.length; i += 500) await db().insert(schema.employees).values(all.slice(i, i + 500)).onConflictDoUpdate({ target: schema.employees.id, set: { name: ex("name"), designation: ex("designation"), department: ex("department"), category: ex("category"), doj: ex("doj"), status: ex("status"), shift: ex("shift"), mobile: ex("mobile"), email: ex("email"), pan: ex("pan"), uan: ex("uan"), bankAccount: ex("bank_account"), ifsc: ex("ifsc") } });
         await db().execute(sql`update users set name = e.name from employees e where users.login = upper(e.id) and users.name <> e.name`);
@@ -199,7 +203,7 @@ export const DATASETS: Record<string, DataSet> = {
     rows: async (ctx) => (await db().select({ s: schema.salaryStructure, n: schema.employees.name }).from(schema.salaryStructure).leftJoin(schema.employees, eq(schema.employees.id, schema.salaryStructure.employeeId)).orderBy(asc(schema.salaryStructure.employeeId))).map((x) => [pid(ctx, x.s.employeeId), x.n || "", x.s.component, Number(x.s.amount)]),
     imp: {
       headers: ["Employee ID", "Component", "Monthly amount"],
-      help: ["Existing employee ID", "Name of an active salary component. Add “Provident fund”, “ESI” or “Employer PF” with amount 1 to switch those on; they are calculated automatically.", "Full-month amount in rupees. 0 removes the component from that employee."],
+      help: ["Existing employee ID", "Name of an active salary component. For components whose rule is Auto (PF, ESI) enter 1; payroll calculates them.", "Full-month amount in rupees. 0 removes the component from that employee."],
       types: { "Monthly amount": "num" }, required: ["Employee ID", "Component", "Monthly amount"],
       prepare: async () => ({ emps: await empSet(), comps: await act("sal") }),
       validate: (o, p, ctx) => {

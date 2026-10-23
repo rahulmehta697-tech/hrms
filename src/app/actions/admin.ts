@@ -174,3 +174,22 @@ export async function userAction(fd: FormData) {
   await log(who(u), `${act === "role" ? `Changed role of ${t!.name} to ${ROLES[s(fd, "role") as Role]}` : `${act[0].toUpperCase() + act.slice(1)}d login ${t!.name} (${t!.login})`}`);
   go(back, "ok", "Saved.");
 }
+
+/* ---------------- licence ---------------- */
+export async function saveLicence(fd: FormData) {
+  const u = await requireAdmin();
+  const { readKey } = await import("@/lib/license");
+  const key = s(fd, "key").replace(/\s+/g, "");
+  const { lic, err } = readKey(key);
+  if (!lic) go("/admin/licence", "err", err!);
+  await db().insert(schema.settings).values({ key: "licence", value: key }).onConflictDoUpdate({ target: schema.settings.key, set: { value: key, updatedAt: new Date() } });
+  await log(who(u), `Entered licence ${lic!.id} for ${lic!.c} (${lic!.e || "unlimited"} employees, expires ${lic!.x})`);
+  revalidatePath("/", "layout");
+  go("/admin/licence", "ok", "Licence key accepted.");
+}
+export async function removeLicence() {
+  const u = await requireAdmin();
+  await db().delete(schema.settings).where(eq(schema.settings.key, "licence"));
+  await log(who(u), "Removed the stored licence key");
+  go("/admin/licence", "ok", "Licence key removed.");
+}

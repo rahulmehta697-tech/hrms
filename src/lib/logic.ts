@@ -178,16 +178,23 @@ export function summarise(days: { st: DayStatus }[]) {
 }
 
 /* ---------------- payroll ---------------- */
-export async function computePayroll(month: string) {
+export async function salaryRules() {
   const sal = await activeRows("sal");
-  const kind = Object.fromEntries(sal.map((r) => [String(r.data[0]), String(r.data[1])]));
+  return {
+    kind: Object.fromEntries(sal.map((r) => [String(r.data[0]), String(r.data[1])])) as Record<string, string>,
+    rule: Object.fromEntries(sal.map((r) => [String(r.data[0]), String(r.data[4] || "Fixed amount")])) as Record<string, string>,
+  };
+}
+export async function computePayroll(month: string) {
+  const { kind, rule } = await salaryRules();
   const emps = await db().select().from(schema.employees).where(ne(schema.employees.status, "Exited"));
   const struct = await db().select().from(schema.salaryStructure);
   const inputs = await db().select().from(schema.payInputs).where(eq(schema.payInputs.month, month));
   const days = daysInMonth(month);
+  const AUTO = ["Auto: employee PF", "Auto: employee ESI", "Auto: employer PF"];
   const lines: { month: string; employeeId: string; data: PayLine }[] = [];
   for (const e of emps) {
-    const st = struct.filter((s) => s.employeeId === e.id);
+    const st = struct.filter((s) => s.employeeId === e.id && kind[s.component]);
     if (!st.length) continue;
     const inp = inputs.filter((i) => i.employeeId === e.id);
     const lop = Math.min(days, inp.filter((i) => i.component === "LOP days").reduce((s, i) => s + Number(i.amount), 0));
@@ -197,15 +204,18 @@ export async function computePayroll(month: string) {
     for (const s of st) if (kind[s.component] === "Earning") add(earnings, s.component, Math.round(Number(s.amount) * f));
     for (const i of inp) if (kind[i.component] === "Earning") add(earnings, i.component, Math.round(Number(i.amount)));
     const gross = earnings.reduce((s, x) => s + x[1], 0);
-    const basic = earnings.find((x) => x[0] === "Basic pay")?.[1] || 0;
-    const has = (n: string) => st.some((s) => s.component === n);
-    if (has("Provident fund")) add(deductions, "Provident fund", Math.round(Math.min(basic, 15000) * 0.12));
-    const esi = has("ESI") && gross > 0 && gross <= 21000;
-    if (esi) add(deductions, "ESI", Math.ceil(gross * 0.0075));
-    for (const s of st) if (kind[s.component] === "Deduction" && !["Provident fund", "ESI"].includes(s.component)) add(deductions, s.component, Math.round(Number(s.amount)));
+    const basic = earnings.filter((x) => rule[x[0]] === "Basic pay").reduce((s, x) => s + x[1], 0);
+    const withRule = (r: string) => st.find((s) => rule[s.component] === r)?.component;
+    const pf = withRule("Auto: employee PF"), esi = withRule("Auto: employee ESI"), epf = withRule("Auto: employer PF");
+    const pfAmt = Math.round(Math.min(basic, 15000) * 0.12);
+    if (pf) add(deductions, pf, pfAmt);
+    const esiOn = !!esi && gross > 0 && gross <= 21000;
+    if (esiOn) add(deductions, esi!, Math.ceil(gross * 0.0075));
+    for (const s of st) if (kind[s.component] === "Deduction" && !AUTO.includes(rule[s.component])) add(deductions, s.component, Math.round(Number(s.amount)));
     for (const i of inp) if (kind[i.component] === "Deduction") add(deductions, i.component, Math.round(Number(i.amount)));
-    if (has("Employer PF")) add(employer, "Employer PF", Math.round(Math.min(basic, 15000) * 0.12));
-    if (esi) add(employer, "Employer ESI", Math.ceil(gross * 0.0325));
+    if (epf) add(employer, epf, pfAmt);
+    if (esiOn) add(employer, "Employer ESI", Math.ceil(gross * 0.0325));
+    for (const s of st) if (kind[s.component] === "Employer contribution" && !AUTO.includes(rule[s.component])) add(employer, s.component, Math.round(Number(s.amount)));
     const ded = deductions.reduce((s, x) => s + x[1], 0);
     lines.push({ month, employeeId: e.id, data: { earnings, deductions, employer, gross, ded, net: gross - ded, paidDays: paid, days, lop } });
   }

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSettings, isSetUp } from "@/lib/settings";
 import { getUser } from "@/lib/auth";
 import { login } from "@/app/actions/auth";
+import Powered from "@/components/Powered";
 import { Flash, Mark } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +35,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           </form>
         )}
       </div>
+      <div style={{ marginTop: 16 }}><Powered center /></div>
     </div>
   );
 }

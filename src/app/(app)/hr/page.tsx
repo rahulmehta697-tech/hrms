@@ -33,8 +33,9 @@ export default async function HrOverview() {
         <div className="card"><h2>Today&apos;s punches by source</h2>{bySrc.length ? bySrc.map((x) => <div className="hbar" key={x.s}><span>{x.s}</span><div className="bar"><i style={{ width: `${(Number(x.c) / smx) * 100}%` }} /></div><span className="num" style={{ textAlign: "right" }}>{Number(x.c).toLocaleString("en-IN")}</span></div>) : <div className="empty">No punches for today yet. Import today&apos;s device files on the Attendance register.</div>}</div>
       </div>
       <div className="grid g2">
-        <div className="card"><h2>Below {rules.thr}% this month · {rules.thrCat}</h2><p className="hint" style={{ margin: "-6px 0 10px" }}>{monthLabel(m)} so far. Threshold set in Attendance rules.</p>
+        {rules.thrCat ? <div className="card"><h2>Below {rules.thr}% this month · {rules.thrCat}</h2><p className="hint" style={{ margin: "-6px 0 10px" }}>{monthLabel(m)} so far. Threshold set in Attendance rules.</p>
           {low.length ? <div className="list">{low.map(({ e, s }) => <div key={e.id}><div>{e.name}<div className="hint">{e.designation} · {e.department}</div></div><span className="pill p-bad num">{s.pct}%</span></div>)}</div> : <div className="empty">No one below the threshold.</div>}</div>
+          : <div className="card"><h2>Attendance threshold</h2><div className="empty">No minimum attendance is set. The Master Admin can set one in Attendance rules.</div></div>}
         <div className="card"><h2>{monthLabel(m)} payroll</h2>
           <p style={{ margin: "0 0 10px" }}>{["Not started", "Computed", "HR reviewed", "Accounts approved", "Closed and released"][run?.step || 0]}</p>
           <div className="bar"><i style={{ width: `${((run?.step || 0) / 4) * 100}%` }} /></div>

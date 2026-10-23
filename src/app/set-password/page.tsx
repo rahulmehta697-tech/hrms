@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSettings } from "@/lib/settings";
 import { getUser, passwordExpired, pwRuleText } from "@/lib/auth";
 import { setPassword, logout } from "@/app/actions/auth";
+import Powered from "@/components/Powered";
 import { Flash, Mark } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,7 @@ export default async function SetPasswordPage({ searchParams }: { searchParams: 
         </form>
         <form action={logout} style={{ marginTop: 10 }}><button className="btn link" type="submit">Sign out</button></form>
       </div>
+      <div style={{ marginTop: 16 }}><Powered center /></div>
     </div>
   );
 }

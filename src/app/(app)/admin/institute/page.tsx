@@ -11,13 +11,13 @@ export default async function Institute({ searchParams }: { searchParams: Promis
   const { org } = await getSettings();
   return (
     <>
-      <Head tag="Settings" title="Institute profile" sub="The name and logo appear on the sign-in page, in the top bar, and on every exported Excel and PDF file." />
+      <Head tag="Settings" title="Organisation profile" sub="The name and logo appear on the sign-in page, in the top bar, and on every exported Excel and PDF file." />
       <Flash sp={sp} />
       <form action={saveOrg} className="stack">
         <div className="card"><h2>Logo</h2><LogoInput current={org.logo} />
           {org.logo && <label className="chk" style={{ marginTop: 8 }}><input type="checkbox" name="removeLogo" value="1" /> Remove the current logo</label>}</div>
         <div className="card"><h2>Details</h2><div className="f">
-          <div className="fld wide"><label htmlFor="name">Institute name</label><input id="name" name="name" defaultValue={org.name} required /></div>
+          <div className="fld wide"><label htmlFor="name">Organisation name</label><input id="name" name="name" defaultValue={org.name} required /></div>
           <div className="fld"><label htmlFor="short">Short name</label><input id="short" name="short" defaultValue={org.short} maxLength={12} /><span className="hint">Shown when there is no logo, and used in file names.</span></div>
           <div className="fld"><label htmlFor="addr">City / address line</label><input id="addr" name="addr" defaultValue={org.addr} /></div>
           <div className="fld"><label htmlFor="prefix">Employee ID prefix</label><input id="prefix" name="prefix" defaultValue={org.prefix} maxLength={8} /><span className="hint">Login IDs look like <span className="mono">{org.prefix}-F-1042</span>. Changing this changes everyone&apos;s login ID.</span></div>

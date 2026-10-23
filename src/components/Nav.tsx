@@ -5,7 +5,9 @@ export type NavItem = { href?: string; label: string; badge?: number; adm?: bool
 
 export default function Nav({ items }: { items: NavItem[] }) {
   const p = usePathname();
-  const active = (h: string) => (h === "/" ? p === "/" : p === h || p.startsWith(h + "/"));
+  const hit = (h: string) => (h === "/" ? p === "/" : p === h || p.startsWith(h + "/"));
+  const best = items.filter((i) => i.href && hit(i.href)).map((i) => i.href!).sort((a, b) => b.length - a.length)[0];
+  const active = (h: string) => h === best;
   return (
     <nav className="rail" aria-label="Modules">
       {items.map((it, i) => it.href

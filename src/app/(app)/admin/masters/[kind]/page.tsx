@@ -30,7 +30,7 @@ export default async function MasterPage({ params, searchParams }: { params: Pro
       <Head tag="Master field" title={def.title} sub={`${def.desc} Edit a row and press Save; use Import to load many rows from Excel.`}><DataBar ds={"master-" + kind} importLabel={def.title.toLowerCase()} {...bar} /></Head>
       <Flash sp={sp} />
       <div className="card"><div className="tw"><table className="mt"><thead><tr>{def.cols.map((c) => <th key={c.key}>{c.label}</th>)}<th>Status</th><th></th></tr></thead>
-        <tbody>{rows.map((r) => <tr key={r.id} className={r.active ? "" : "off"}>
+        <tbody>{!rows.length && <tr><td colSpan={def.cols.length + 2}><div className="empty">Nothing here yet. Add the first entry in the row below, or use Import to load a list from Excel ({def.hint}).</div></td></tr>}{rows.map((r) => <tr key={r.id} className={r.active ? "" : "off"}>
           {def.cols.map((c, i) => <td key={c.key}>{field(c, `f${r.id}`, `r${r.id}_${c.key}`, r.data[i])}</td>)}
           <td><span className={"pill " + (r.active ? "p-ok" : "p-mute")}>{r.active ? "Active" : "Inactive"}</span></td>
           <td><div className="row" style={{ gap: 4, flexWrap: "nowrap" }}>

@@ -4,6 +4,7 @@ import { jsPDF } from "jspdf";
 import { autoTable } from "jspdf-autotable";
 import type { Org } from "./config";
 import { fdt } from "./dates";
+import { PRODUCT } from "./product";
 
 type Cell = string | number;
 
@@ -13,7 +14,7 @@ export async function toXlsx(org: Org, title: string, by: string, headers: strin
   const ws = wb.addWorksheet(title.replace(/[\[\]:*?/\\]/g, " ").slice(0, 31));
   ws.addRow([org.name]).font = { bold: true, size: 14 };
   ws.addRow([title]).font = { bold: true, size: 12 };
-  ws.addRow([`Generated ${fdt(new Date(), org.tz)} by ${by}`]).font = { italic: true, color: { argb: "FF5A6762" } };
+  ws.addRow([`Generated ${fdt(new Date(), org.tz)} by ${by} · Powered by ${PRODUCT.name}`]).font = { italic: true, color: { argb: "FF5A6762" } };
   ws.addRow([]);
   const h = ws.addRow(headers);
   h.eachCell((c) => { c.font = { bold: true, color: { argb: "FFFFFFFF" } }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF17705C" } }; c.alignment = { vertical: "middle", wrapText: true }; });
@@ -40,7 +41,7 @@ export function pdfStart(org: Org, title: string, by: string, landscape: boolean
 }
 export function pdfFinish(doc: jsPDF, org: Org) {
   const n = doc.getNumberOfPages(), W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
-  for (let i = 1; i <= n; i++) { doc.setPage(i); doc.setFontSize(8); doc.setTextColor(120); doc.text(pdfs(`${org.name} · HRMS`), 40, H - 22); doc.text(`Page ${i} of ${n}`, W - 40, H - 22, { align: "right" }); }
+  for (let i = 1; i <= n; i++) { doc.setPage(i); doc.setFontSize(8); doc.setTextColor(120); doc.text(pdfs(org.name), 40, H - 22); doc.text(pdfs(`Powered by ${PRODUCT.name}`), W / 2, H - 22, { align: "center" }); doc.text(`Page ${i} of ${n}`, W - 40, H - 22, { align: "right" }); }
   return Buffer.from(doc.output("arraybuffer"));
 }
 export const TABLE = { styles: { fontSize: 8, cellPadding: 4, overflow: "linebreak" as const, textColor: [22, 32, 28] as [number, number, number] }, headStyles: { fillColor: [23, 112, 92] as [number, number, number], textColor: 255, fontStyle: "bold" as const }, alternateRowStyles: { fillColor: [243, 246, 245] as [number, number, number] }, margin: { left: 40, right: 40, bottom: 40 } };
@@ -60,7 +61,7 @@ export async function template(org: Org, title: string, headers: string[], help:
   ws.columns.forEach((c, i) => { c.width = Math.max(14, headers[i].length + 4); });
   ws.views = [{ state: "frozen", ySplit: 1 }];
   const ins = wb.addWorksheet("Instructions");
-  ins.addRow([`${org.name} · ${title} import template`]).font = { bold: true, size: 13 };
+  ins.addRow([`${org.name} · ${title} import template · ${PRODUCT.name}`]).font = { bold: true, size: 13 };
   ins.addRow(["Fill the Data sheet from row 2. Keep the header row as it is. One row per record. Rows with problems are shown before anything is saved."]);
   ins.addRow([]);
   ins.addRow(["Column", "Required", "What to enter"]).font = { bold: true };

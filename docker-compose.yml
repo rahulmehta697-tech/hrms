@@ -1,0 +1,50 @@
+# On-premise install: copy .env.onprem.example to .env, fill it in, then run:  docker compose up -d
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hrms
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      POSTGRES_DB: hrms
+    volumes:
+      - hrms-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hrms"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    image: hrms:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://hrms:${DB_PASSWORD}@db:5432/hrms
+      SETUP_KEY: ${SETUP_KEY:?Set SETUP_KEY in .env}
+      LICENSE_KEY: ${LICENSE_KEY:-}
+      PRODUCT_NAME: ${PRODUCT_NAME:-}
+      PRODUCT_URL: ${PRODUCT_URL:-}
+      PRODUCT_SUPPORT: ${PRODUCT_SUPPORT:-}
+    ports:
+      - "${HTTP_PORT:-3000}:3000"
+
+  # Optional: automatic HTTPS for a domain name. Start with:  docker compose --profile https up -d
+  https:
+    image: caddy:2-alpine
+    profiles: ["https"]
+    restart: unless-stopped
+    depends_on: [app]
+    command: caddy reverse-proxy --from ${DOMAIN:-localhost} --to app:3000
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy-data:/data
+
+volumes:
+  hrms-db:
+  caddy-data:

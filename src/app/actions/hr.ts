@@ -8,6 +8,7 @@ import { computePayroll } from "@/lib/logic";
 import { EMP_STATUS } from "@/lib/config";
 import { isDate, monthLabel } from "@/lib/dates";
 import { log } from "@/lib/audit";
+import { employeeRoom } from "@/lib/license";
 
 const go = (path: string, k: "ok" | "err", m: string): never => redirect(`${path}${path.includes("?") ? "&" : "?"}${k}=${encodeURIComponent(m)}`);
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
@@ -31,9 +32,12 @@ export async function saveEmployee(fd: FormData) {
   if (isNew) {
     const ex = await db().select({ id: schema.employees.id }).from(schema.employees).where(eq(schema.employees.id, id));
     if (ex.length) go(back, "err", `Employee ID ${id} already exists.`);
+    if (v.status !== "Exited") { const room = await employeeRoom(1); if (room) go(back, "err", room); }
     await db().insert(schema.employees).values({ id, ...v });
     await log(who(u), `Added employee ${id} ${v.name}`);
   } else {
+    const old = (await db().select({ st: schema.employees.status }).from(schema.employees).where(eq(schema.employees.id, id)))[0];
+    if (old?.st === "Exited" && v.status !== "Exited") { const room = await employeeRoom(1); if (room) go(back, "err", room); }
     await db().update(schema.employees).set(v).where(eq(schema.employees.id, id));
     await db().update(schema.users).set({ name: v.name, ...(v.status === "Exited" ? { status: "Disabled" } : {}) }).where(eq(schema.users.login, id));
     await log(who(u), `Updated employee ${id} ${v.name}${v.status === "Exited" ? " (exited; login disabled)" : ""}`);
@@ -145,8 +149,8 @@ export async function startOnboarding(fd: FormData) {
   const c = (await db().select().from(schema.candidates).where(eq(schema.candidates.id, id)))[0];
   const r = c && (await db().select().from(schema.requisitions).where(eq(schema.requisitions.id, c.requisitionId)))[0];
   if (!c || !r) go("/recruitment", "err", "Candidate not found.");
-  const kind = /nurs/i.test(r!.title + r!.department) ? "Nursing" : /^dr\.?\s|professor|resident|tutor/i.test(c!.name + " " + r!.title) ? "Doctors" : /techn|pharm|radiog|lab/i.test(r!.title) ? "Paramedical" : "All";
-  await db().insert(schema.joiners).values({ name: c!.name, roleText: `${r!.title} · ${r!.department}`, kind, joinDate: s(fd, "joinDate") || null });
+  const cat = (await db().select({ c: schema.masters.data }).from(schema.masters).where(eq(schema.masters.kind, "desig"))).find((x) => String(x.c[0]) === r!.title)?.c[1];
+  await db().insert(schema.joiners).values({ name: c!.name, roleText: `${r!.title} · ${r!.department}`, kind: cat ? String(cat) : "All", joinDate: s(fd, "joinDate") || null });
   await log(who(u), `Started onboarding for ${c!.name}`);
   go("/onboarding", "ok", `${c!.name} added to onboarding.`);
 }
@@ -166,6 +170,13 @@ export async function tickJoiner(fd: FormData) {
   await db().update(schema.joiners).set({ done: { ...j!.done, [item]: on } }).where(eq(schema.joiners.id, id));
   await log(who(u), `Onboarding ${j!.name}: “${item}” ${on ? "done" : "not done"}`);
   go(`/onboarding#j${id}`, "ok", "Updated.");
+}
+export async function setJoinerKind(fd: FormData) {
+  const u = await requirePerm("recruitment");
+  const id = Number(fd.get("id")), kind = s(fd, "kind") || "All";
+  await db().update(schema.joiners).set({ kind }).where(eq(schema.joiners.id, id));
+  await log(who(u), `Onboarding joiner #${id}: category set to ${kind}`);
+  go(`/onboarding#j${id}`, "ok", "Category updated.");
 }
 export async function removeJoiner(fd: FormData) {
   const u = await requirePerm("recruitment");

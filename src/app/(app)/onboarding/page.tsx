@@ -1,10 +1,10 @@
 import { desc } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requirePerm, can } from "@/lib/auth";
-import { activeRows, getSettings } from "@/lib/settings";
+import { activeList, activeRows, getSettings } from "@/lib/settings";
 import { barFor } from "@/lib/datasets";
 import { fd, nowIn } from "@/lib/dates";
-import { addJoiner, removeJoiner, tickJoiner } from "@/app/actions/hr";
+import { addJoiner, removeJoiner, setJoinerKind, tickJoiner } from "@/app/actions/hr";
 import DataBar from "@/components/DataBar";
 import { Confirm, Flash, Head } from "@/components/ui";
 
@@ -17,6 +17,7 @@ export default async function Onboarding({ searchParams }: { searchParams: Promi
   const js = await db().select().from(schema.joiners).orderBy(desc(schema.joiners.joinDate));
   const bar = await barFor(u, "onboarding");
   const canEmp = await can(u, "employees");
+  const cats = await activeList("cat");
   return (
     <>
       <Head title="Onboarding" sub="New joiners and their checklist. Checklist items come from Master fields → Onboarding checklist."><DataBar ds="onboarding" {...bar} /></Head>
@@ -32,16 +33,17 @@ export default async function Onboarding({ searchParams }: { searchParams: Promi
             {its.map((r) => { const k = String(r.data[0]), on = !!j.done[k]; return (
               <form key={k} action={tickJoiner} className="chk"><input type="hidden" name="id" value={j.id} /><input type="hidden" name="item" value={k} /><input type="hidden" name="on" value={on ? "0" : "1"} />
                 <button type="submit" className="btn link" style={{ padding: 0, fontSize: "inherit", color: "inherit", textAlign: "left", display: "flex", gap: 10 }} aria-pressed={on}><span aria-hidden="true" style={{ width: 16, height: 16, border: "1.5px solid var(--line)", borderRadius: 4, background: on ? "var(--accent)" : "transparent", flex: "none", marginTop: 2 }} />{k}</button></form>); })}
+            <form action={setJoinerKind} className="row" style={{ marginTop: 10, gap: 6 }}><input type="hidden" name="id" value={j.id} /><label className="hint" htmlFor={"k" + j.id}>Category</label><select className="mini" id={"k" + j.id} name="kind" defaultValue={j.kind}><option value="All">Not set</option>{cats.map((c) => <option key={c}>{c}</option>)}</select><button className="btn sm" type="submit">Set</button></form>
             <div className="row" style={{ marginTop: 10 }}>
               {canEmp && <a className="btn sm" href={`/employees/new?name=${encodeURIComponent(j.name)}`}>Create employee record</a>}
               <Confirm label="Remove" confirm={`Remove ${j.name}`} action={removeJoiner}><input type="hidden" name="id" value={j.id} /></Confirm>
             </div>
-          </div>); })}</div> : <div className="card"><div className="empty">No joiners yet. Start onboarding from a candidate at the Joining stage, or add someone below.</div></div>}
+          </div>); })}</div> : <div className="card"><div className="empty">{items.length ? "No joiners yet. Start onboarding from a candidate at the Joining stage, or add someone below." : "Add checklist items first in Master fields → Onboarding checklist, then add joiners."}</div></div>}
       <div className="card"><h2>Add a joiner</h2>
         <form action={addJoiner} className="f">
           <div className="fld"><label htmlFor="name">Name</label><input id="name" name="name" required /></div>
           <div className="fld"><label htmlFor="roleText">Role and department</label><input id="roleText" name="roleText" placeholder="Staff Nurse · Medical ICU" /></div>
-          <div className="fld"><label htmlFor="kind">Kind of staff</label><select id="kind" name="kind"><option>All</option><option>Doctors</option><option>Nursing</option><option>Paramedical</option></select></div>
+          <div className="fld"><label htmlFor="kind">Category</label><select id="kind" name="kind"><option value="All">Not set</option>{cats.map((c) => <option key={c}>{c}</option>)}</select></div>
           <div className="fld"><label htmlFor="joinDate">Joining date</label><input id="joinDate" name="joinDate" type="date" /></div>
           <div className="fld wide"><div><button className="btn primary" type="submit">Add joiner</button></div></div>
         </form>
