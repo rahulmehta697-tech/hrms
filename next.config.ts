@@ -4,6 +4,8 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["exceljs", "jspdf", "jspdf-autotable", "pg"],
   experimental: { serverActions: { bodySizeLimit: "4mb" } },
   poweredByHeader: false,
+  // The migration files must ship with the server so the app can create its tables on first run.
+  outputFileTracingIncludes: { "/**": ["./drizzle/**/*"] },
   async headers() {
     return [{
       source: "/(.*)",

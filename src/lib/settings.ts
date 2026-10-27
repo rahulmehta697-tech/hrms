@@ -1,11 +1,12 @@
 import { cache } from "react";
 import { eq, asc } from "drizzle-orm";
-import { db, schema } from "@/db";
+import { db, ensureSchema, schema } from "@/db";
 import { DEFAULTS, MASTERS, type Org, type Policy, type Rules, type Flow, type Access } from "./config";
 
 type SettingMap = { org: Org; pol: Policy; rules: Rules; flows: Flow[]; access: Access };
 
 export const getSettings = cache(async (): Promise<SettingMap> => {
+  await ensureSchema();
   const rows = await db().select().from(schema.settings);
   const m = Object.fromEntries(rows.map((r) => [r.key, r.value])) as Partial<SettingMap>;
   return {
@@ -41,6 +42,7 @@ export async function activeRows(kind: string) {
 }
 
 export async function isSetUp() {
+  await ensureSchema();
   const r = await db().select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.role, "admin")).limit(1);
   return r.length > 0;
 }

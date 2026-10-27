@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { ensureSchema } from "@/db";
 import { isSetUp } from "@/lib/settings";
 import { DEMO } from "@/lib/demo";
 import { sql } from "drizzle-orm";
@@ -10,6 +11,7 @@ import { Flash } from "@/components/ui";
 export const dynamic = "force-dynamic";
 
 export default async function SetupPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
+  await ensureSchema();
   if (DEMO || (await isSetUp())) redirect("/login");
   const sp = await searchParams;
   const recovery = Number((await db().select({ n: sql<number>`count(*)` }).from(schema.settings))[0].n) > 0;

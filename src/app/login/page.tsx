@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { dbUrl, ensureSchema } from "@/db";
 import { getSettings, isSetUp } from "@/lib/settings";
 import { DEMO, DEMO_ACCOUNTS, DEMO_PASSWORD, DEMO_RESET_TIME, seedDemo } from "@/lib/demo";
 import { getUser } from "@/lib/auth";
@@ -9,6 +10,11 @@ import { Flash, Mark } from "@/components/ui";
 export const dynamic = "force-dynamic";
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
+  if (!dbUrl()) return (
+    <div className="auth"><div className="card stack"><h1>Almost there</h1>
+      <p className="muted" style={{ margin: 0 }}>No database is connected to this site yet. In Vercel, open this project&apos;s <b>Storage</b> tab, connect a Neon database, then open <b>Deployments</b> and redeploy. The tables and sample data are created on the first visit after that.</p></div></div>
+  );
+  await ensureSchema();
   if (!(await isSetUp())) { if (DEMO) await seedDemo(); else redirect("/setup"); }
   if (await getUser()) redirect("/");
   const sp = await searchParams;

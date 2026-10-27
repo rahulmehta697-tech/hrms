@@ -3,9 +3,9 @@ import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 
-const url = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
+const url = process.env.DATABASE_URL_UNPOOLED || process.env.POSTGRES_URL_NON_POOLING || process.env.DATABASE_URL || process.env.POSTGRES_URL;
 if (!url) {
-  console.warn("[migrate] DATABASE_URL is not set, skipping migrations.");
+  console.warn("[migrate] No database connected yet; tables will be created on the first visit.");
   process.exit(0);
 }
 const local = /localhost|127\.0\.0\.1/.test(url);
