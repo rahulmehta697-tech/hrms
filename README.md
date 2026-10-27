@@ -12,7 +12,7 @@ A web-based HR system sold to organisations as one copy per customer: employee r
 |---|---|
 | Staff | Home dashboard, leave balance and applications, attendance calendar with every punch and its source, regularisation requests, payslips (PDF), change password |
 | HOD | Approvals for their department, team attendance for any day |
-| HR Office | Overview, employee records, attendance register (daily and monthly), leave register and opening balances, payroll runs, recruitment pipeline, onboarding checklists, Excel/PDF export |
+| HR Office | Overview, employee records, attendance register (daily and monthly), leave register and opening balances, payroll runs, recruitment pipeline, one-time joining-form links for new joiners with document upload and HR verification, joining checklists, Excel/PDF export |
 | Accounts / Management | Approval levels in workflows; Accounts approves payroll |
 | Master Admin | Setup checklist, organisation profile and logo, licence, users and passwords, password policy, roles and access, approval workflows, attendance rules, nine master tables, change log, Excel import everywhere |
 

@@ -26,6 +26,7 @@ services:
       DATABASE_URL: postgres://hrms:${DB_PASSWORD}@db:5432/hrms
       SETUP_KEY: ${SETUP_KEY:?Set SETUP_KEY in .env}
       LICENSE_KEY: ${LICENSE_KEY:-}
+      DATA_KEY: ${DATA_KEY:-}
       PRODUCT_NAME: ${PRODUCT_NAME:-}
       PRODUCT_URL: ${PRODUCT_URL:-}
       PRODUCT_SUPPORT: ${PRODUCT_SUPPORT:-}

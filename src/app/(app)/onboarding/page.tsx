@@ -20,7 +20,7 @@ export default async function Onboarding({ searchParams }: { searchParams: Promi
   const cats = await activeList("cat");
   return (
     <>
-      <Head title="Onboarding" sub="New joiners and their checklist. Checklist items come from Master fields → Onboarding checklist."><DataBar ds="onboarding" {...bar} /></Head>
+      <Head title="Joining checklist" sub="Steps for each new joiner after they are accepted. Items come from Settings → Onboarding checklist. Invite new joiners to fill their details from New joiners."><DataBar ds="onboarding" {...bar} /></Head>
       <Flash sp={sp} />
       {js.length ? <div className="grid g2">{js.map((j) => {
         const its = items.filter((r) => r.data[1] === "All" || r.data[1] === j.kind);

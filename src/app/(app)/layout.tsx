@@ -3,6 +3,7 @@ import { db, schema } from "@/db";
 import { requireUser, can } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { actionable, departmentsHeadedBy } from "@/lib/logic";
+import { countToVerify } from "@/lib/joiners";
 import { ROLES, type Role } from "@/lib/config";
 import { logout } from "@/app/actions/auth";
 import Nav, { type NavData, type NavGroup, type NavLink } from "@/components/Nav";
@@ -39,11 +40,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
   const hr: NavLink[] = [];
   if (await P("reports")) hr.push({ href: "/hr", label: "Overview", icon: "overview" });
-  if (await P("employees")) hr.push({ href: "/employees", label: "Employees", icon: "employees" });
+  if (await P("employees")) hr.push({ href: "/employees", label: "Employees", icon: "employees" }, { href: "/joiners", label: "New joiners", icon: "userplus", badge: await countToVerify() });
   if (await P("attendance")) hr.push({ href: "/attendance-register", label: "Attendance register", icon: "register" });
   if ((await P("employees")) || (await P("attendance"))) hr.push({ href: "/leave-register", label: "Leave register", icon: "calendar" });
   if (await P("payroll")) hr.push({ href: "/payroll", label: "Payroll", icon: "payroll" });
-  if (await P("recruitment")) hr.push({ href: "/recruitment", label: "Recruitment", icon: "briefcase" }, { href: "/onboarding", label: "Onboarding", icon: "userplus" });
+  if (await P("recruitment")) hr.push({ href: "/recruitment", label: "Recruitment", icon: "briefcase" }, { href: "/onboarding", label: "Joining checklist", icon: "checklist" });
   if (await P("masters")) bottom.push({ href: "/settings", label: "Settings", icon: "settings", match: ["/admin/"] });
   if (u.role === "admin") bottom.push({ href: "/admin/audit", label: "Change log", icon: "history" });
   // Office roles see their office work first; everyone else sees their own work first.

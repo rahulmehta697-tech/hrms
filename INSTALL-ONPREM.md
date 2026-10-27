@@ -21,6 +21,7 @@ nano .env
 |---|---|
 | `DB_PASSWORD` | A long password for the built-in database. You don't need to remember it. |
 | `SETUP_KEY` | A long random phrase. You'll type it once on the first-run page. |
+| `DATA_KEY` | Encrypts Aadhaar numbers. Generate once with `openssl rand -base64 32`, keep a copy safe, and never change it. |
 | `LICENSE_KEY` | The key from your vendor (starts with `HRMS1.`). It can also be pasted later in the portal. |
 | `HTTP_PORT` | The port staff use, default `3000`. |
 | `DOMAIN` | Only for HTTPS (step 3), e.g. `hrms.yourorg.in`. |

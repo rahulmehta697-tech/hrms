@@ -5,6 +5,9 @@ import { db, schema } from "@/db";
 import { DEFAULTS } from "./config";
 import { addDays, daysInMonth, dow, hm, nowIn, pad, prevMonth } from "./dates";
 import type { PayLine, Step } from "@/db/schema";
+import { encrypt, sha256 } from "./secure";
+import { samplePdf, samplePhoto, sampleAadhaar } from "./demofiles";
+import { newToken } from "./joiners";
 
 /** Demo mode is switched on per deployment with DEMO_MODE=1. Never set it on a customer's copy. */
 export const DEMO = process.env.DEMO_MODE === "1";
@@ -84,7 +87,7 @@ function people(): Plan[] {
   return out;
 }
 
-const TABLES = ["sessions", "users", "employees", "punches", "leave_requests", "reg_requests", "leave_opening", "salary_structure", "pay_inputs", "payroll_runs", "payroll_lines", "requisitions", "candidates", "joiners", "audit", "masters", "settings"];
+const TABLES = ["sessions", "users", "employees", "punches", "leave_requests", "reg_requests", "leave_opening", "salary_structure", "pay_inputs", "payroll_runs", "payroll_lines", "requisitions", "candidates", "joiners", "joiner_invites", "files", "audit", "masters", "settings"];
 
 /** Wipes the database and fills it with a realistic sample institute. Dates are relative to today, so the demo always looks current. */
 export async function seedDemo() {
@@ -128,6 +131,7 @@ export async function seedDemo() {
       ["hol", holRows],
       ["src", [["Govt. biometric (AEBAS)", "Biometric fingerprint", "Academic block, 4 devices", "Daily file import"], ["Face kiosks", "Face recognition", "Main gate and hospital block", "Daily file import"], ["Ward RFID readers", "RFID card", "Ward entrances", "Daily file import"], ["Regularised", "Manual entry", "Approved regularisation requests", "Real time"]]],
       ["sal", [["Basic pay", "Earning", "Per pay grade", "Yes", "Basic pay"], ["House rent allowance", "Earning", "", "Yes", "Fixed amount"], ["Special allowance", "Earning", "", "Yes", "Fixed amount"], ["Night duty allowance", "Earning", "From roster", "Yes", "Fixed amount"], ["Provident fund", "Deduction", "", "No", "Auto: employee PF"], ["ESI", "Deduction", "", "No", "Auto: employee ESI"], ["Income tax (TDS)", "Deduction", "Monthly estimate", "No", "Income tax (TDS)"], ["Salary advance recovery", "Deduction", "", "No", "Fixed amount"], ["Employer PF", "Employer contribution", "", "No", "Auto: employer PF"]]],
+      ["jdocs", [["Passport-size photo", "All", "Yes"], ["Aadhaar card", "All", "Yes"], ["PAN card", "All", "Yes"], ["Cancelled cheque or bank passbook", "All", "Yes"], ["Highest degree certificate", "All", "Yes"], ["Medical Council registration", "Teaching faculty", "Yes"], ["Medical Council registration", "Residents", "Yes"], ["Nursing Council registration", "Nursing", "Yes"], ["Experience letter", "All", "No"]]],
       ["docs", [["Offer letter accepted", "All"], ["Degrees, experience and ID verified", "All"], ["Medical Council registration checked", "Teaching faculty"], ["Medical Council registration checked (resident)", "Residents"], ["Nursing Council registration checked", "Nursing"], ["Enrolled on biometric and face kiosk", "All"], ["Portal login issued", "All"], ["Bank account and PF UAN linked", "All"], ["Department induction completed", "All"]]],
     ];
     for (const [kind, rows] of M) await tx.insert(schema.masters).values(rows.map((data, i) => ({ kind, data, sort: i })));
@@ -136,8 +140,19 @@ export async function seedDemo() {
     const emps: Emp[] = ppl.map((p, i) => {
       const y = 2012 + Math.floor(r() * 13), m = 1 + Math.floor(r() * 12);
       const doj = p.id === "F-0104" ? "2023-08-14" : `${y}-${pad(m)}-${pad(1 + Math.floor(r() * 27))}`;
-      return { id: p.id, name: p.name, designation: p.desig, department: p.dept, category: p.cat, doj, status: i > 6 && r() < 0.05 ? "Probation" : "Active", shift: p.shift || null, mobile: `98${String(10000000 + Math.floor(r() * 89999999))}`, email: `${p.name.replace(/^Dr\.\s*/, "").toLowerCase().replace(/[^a-z]+/g, ".")}@dims.example`, pan: null, uan: `1012${String(Math.floor(r() * 1e8)).padStart(8, "0")}`, bankAccount: i % 37 === 9 ? null : `3000${String(Math.floor(r() * 1e8)).padStart(8, "0")}`, ifsc: "SBIN0001234" };
+      const first = p.name.replace(/^Dr\.\s*/, "").split(" ")[0];
+      const fem = FIRST_F.includes(first), aad = sampleAadhaar(r);
+      const by = Number(doj.slice(0, 4)) - 24 - Math.floor(r() * 14);
+      const personal = { dob: `${by}-${pad(1 + Math.floor(r() * 12))}-${pad(1 + Math.floor(r() * 27))}`, gender: fem ? "Female" : "Male", bloodGroup: ["A+", "B+", "O+", "AB+", "B-", "O-"][Math.floor(r() * 6)], maritalStatus: r() < 0.7 ? "Married" : "Single",
+        fatherName: `${FIRST_M[Math.floor(r() * FIRST_M.length)]} ${p.name.split(" ").pop()}`, address: `${10 + Math.floor(r() * 300)}, ${["Rajpur Road", "Clement Town", "Prem Nagar", "Ballupur", "Sahastradhara Road"][Math.floor(r() * 5)]}, Sample City`,
+        emergencyName: `${FIRST_F[Math.floor(r() * FIRST_F.length)]} ${p.name.split(" ").pop()}`, emergencyRelation: fem ? "Mother" : "Spouse", emergencyMobile: `94${String(10000000 + Math.floor(r() * 89999999))}`,
+        aadhaarEnc: encrypt(aad), aadhaarLast4: aad.slice(-4), reportingTo: headOf[p.dept] && headOf[p.dept] !== p.id ? headOf[p.dept] : null };
+      return { ...personal, id: p.id, name: p.name, designation: p.desig, department: p.dept, category: p.cat, doj, status: i > 6 && r() < 0.05 ? "Probation" : "Active", shift: p.shift || null, mobile: `98${String(10000000 + Math.floor(r() * 89999999))}`, email: `${p.name.replace(/^Dr\.\s*/, "").toLowerCase().replace(/[^a-z]+/g, ".")}@dims.example`, pan: null, uan: `1012${String(Math.floor(r() * 1e8)).padStart(8, "0")}`, bankAccount: i % 37 === 9 ? null : `3000${String(Math.floor(r() * 1e8)).padStart(8, "0")}`, ifsc: "SBIN0001234" };
     });
+    const isha = `F-${String(Math.max(...ppl.filter((p) => p.id.startsWith("F-")).map((p) => Number(p.id.slice(2)))) + 1).padStart(4, "0")}`;
+    emps.push({ id: isha, name: "Dr. Isha Nautiyal", designation: "Assistant Professor", department: "Physiology", category: "Teaching faculty", doj: today, status: "Probation", mobile: "9876501234", email: "isha.nautiyal@dims.example", pan: "ABQPN4821K", uan: null, bankAccount: "30004455667", ifsc: "SBIN0001234",
+      dob: "1993-07-19", gender: "Female", fatherName: "Mahesh Nautiyal", bloodGroup: "O+", maritalStatus: "Single", address: "22, Vasant Vihar, Sample City", permAddress: "22, Vasant Vihar, Sample City", emergencyName: "Mahesh Nautiyal", emergencyRelation: "Father", emergencyMobile: "9412233445",
+      ...(() => { const a = sampleAadhaar(r); return { aadhaarEnc: encrypt(a), aadhaarLast4: a.slice(-4) }; })(), qualification: "MD Physiology", institution: "State Medical College", qualYear: "2021", regCouncil: "State Medical Council", regNo: "SMC-41877", reportingTo: headOf["Physiology"] || null, experience: [{ employer: "City Medical College", role: "Senior Resident", from: "Aug 2021", to: "Oct 2026" }] });
     emps.push({ id: "S-0599", name: "Ramesh Kumar", designation: "Ward Attendant", department: "Housekeeping", category: "Support services", doj: "2016-03-01", status: "Exited", shift: null, mobile: null, email: null });
     await tx.insert(schema.employees).values(emps);
 
@@ -269,8 +284,37 @@ export async function seedDemo() {
     await tx.insert(schema.joiners).values([
       { name: "Dr. Mohit Kandari", roleText: "Senior Resident · Anaesthesiology", kind: "Residents", joinDate: addDays(today, 6), done: docs(3, "Residents") },
       { name: "Kiran Rawat", roleText: "Staff Nurse · Nursing Services", kind: "Nursing", joinDate: addDays(today, 4), done: docs(5, "Nursing") },
-      { name: "Dr. Isha Nautiyal", roleText: "Assistant Professor · Physiology", kind: "Teaching faculty", joinDate: addDays(today, -5), done: docs(8, "Teaching faculty") },
+      { name: "Dr. Isha Nautiyal", roleText: "Assistant Professor · Physiology", kind: "Teaching faculty", joinDate: today, done: docs(4, "Teaching faculty"), employeeId: isha },
     ]);
+
+    /* joining-form links in every state (their real links are never shown; create a new invite to try the form) */
+    const jd = (cat: string) => (M.find((m) => m[0] === "jdocs")![1] as string[][]).filter((d) => d[1] === "All" || d[1] === cat);
+    const inv = async (o: Partial<typeof schema.joinerInvites.$inferInsert> & { name: string; category: string; department: string; designation: string }, docsFor = 0) => {
+      const [row] = await tx.insert(schema.joinerInvites).values({ tokenHash: sha256(newToken()), expiresAt: new Date(addDays(today, 5) + "T23:59:59+05:30"), createdBy: "Pooja Kothari (A-0101)", ...o }).returning({ id: schema.joinerInvites.id });
+      const list = jd(o.category).slice(0, docsFor);
+      for (const [i, [k]] of list.entries()) {
+        const data = /photo/i.test(k) ? samplePhoto(row.id * 13) : samplePdf(k, o.name);
+        await tx.insert(schema.files).values({ inviteId: row.id, employeeId: o.employeeId ?? null, kind: k, fileName: /photo/i.test(k) ? "photo.png" : `${k.toLowerCase().replace(/[^a-z]+/g, "-")}.pdf`, mime: /photo/i.test(k) ? "image/png" : "application/pdf", size: data.length, data, createdAt: new Date(Date.now() - i * 60000) });
+      }
+      return row.id;
+    };
+    const hist = (...h: [string, string, string, string?][]) => h.map(([by, action, d, note]) => ({ level: by === "Pooja Kothari" ? "HR" : "Joiner", by, action, at: new Date(d + "T11:00:00+05:30").toISOString(), ...(note ? { note } : {}) }));
+    const kAad = sampleAadhaar(r), rAad = sampleAadhaar(r);
+    await inv({ name: "Kiran Rawat", mobile: "9876543201", email: "kiran.rawat@example.com", category: "Nursing", department: "Nursing Services", designation: "Staff Nurse", shift: "Ward morning", joinDate: addDays(today, 4), status: "submitted", tokenHash: null, submittedAt: new Date(addDays(today, -1) + "T19:42:00+05:30"), openedAt: new Date(addDays(today, -2) + "T18:10:00+05:30"),
+      data: { fullName: "Kiran Rawat", dob: "1998-04-12", gender: "Female", fatherName: "Mohan Singh Rawat", bloodGroup: "B+", maritalStatus: "Single", mobile: "9876543210", email: "kiran.rawat@example.com", address: "House 14, Lane 3, Prem Nagar, Sample City 248001", permAddress: "", emergencyName: "Sunita Rawat", emergencyRelation: "Mother", emergencyMobile: "9412345678", aadhaarEnc: encrypt(kAad), aadhaarLast4: kAad.slice(-4), pan: "ABCPR1234K", uan: "", bankAccount: "30001234567", ifsc: "SBIN0001234", accountHolder: "Kiran Rawat", qualification: "B.Sc Nursing", institution: "State College of Nursing", qualYear: "2022", regCouncil: "State Nursing Council", regNo: "SNC-2022-08841", experience: [{ employer: "City General Hospital", role: "Staff Nurse, ICU", from: "Aug 2022", to: "Oct 2026" }], agree: true },
+      checks: { about: true, contact: true }, history: hist(["Pooja Kothari", "sent link", addDays(today, -3)], ["Kiran Rawat", "submitted", addDays(today, -1)]) }, 7);
+    await inv({ name: "Dr. Ritu Badoni", mobile: "9758812345", category: "Residents", department: "Anaesthesiology", designation: "Senior Resident", joinDate: addDays(today, 8), status: "submitted", tokenHash: null, submittedAt: new Date(today + "T08:15:00+05:30"),
+      data: { fullName: "Dr. Ritu Badoni", dob: "1995-11-02", gender: "Female", fatherName: "Suresh Badoni", bloodGroup: "A+", maritalStatus: "Married", mobile: "9758812345", email: "ritu.badoni@example.com", address: "7, Doon Enclave, Sample City 248002", permAddress: "Village Kandikhal, Tehri", emergencyName: "Amit Badoni", emergencyRelation: "Spouse", emergencyMobile: "9837012345", aadhaarEnc: encrypt(rAad), aadhaarLast4: rAad.slice(-4), pan: "BXKPB7712M", uan: "101234567890", bankAccount: "50100223344", ifsc: "HDFC0001789", accountHolder: "Ritu Badoni", qualification: "DNB Anaesthesiology", institution: "National Board of Examinations", qualYear: "2026", regCouncil: "State Medical Council", regNo: "SMC-38812", experience: [], agree: true },
+      history: hist(["Pooja Kothari", "sent link", addDays(today, -4)], ["Dr. Ritu Badoni", "submitted", today]) }, 7);
+    await inv({ name: "Dr. Mohit Kandari", mobile: "9719934567", category: "Residents", department: "Anaesthesiology", designation: "Senior Resident", joinDate: addDays(today, 6), status: "opened", openedAt: new Date(addDays(today, -1) + "T21:05:00+05:30"), data: { fullName: "Dr. Mohit Kandari", dob: "1996-02-21", gender: "Male", fatherName: "Dinesh Kandari" }, history: hist(["Pooja Kothari", "sent link", addDays(today, -2)]) }, 1);
+    await inv({ name: "Rakesh Panwar", mobile: "9690012345", category: "Paramedical", department: "Central Lab", designation: "Lab Technician", joinDate: addDays(today, 12), history: hist(["Pooja Kothari", "sent link", today]) });
+    await inv({ name: "Sonia Chauhan", mobile: "9997712345", category: "Nursing", department: "Nursing Services", designation: "Staff Nurse", joinDate: addDays(today, 9), status: "corrections", note: "Please upload a clearer copy of your PAN card, and add your Nursing Council registration number.", data: { fullName: "Sonia Chauhan", dob: "1997-09-30", gender: "Female", mobile: "9997712345" },
+      history: hist(["Pooja Kothari", "sent link", addDays(today, -6)], ["Sonia Chauhan", "submitted", addDays(today, -3)], ["Pooja Kothari", "asked for corrections", addDays(today, -2), "Please upload a clearer copy of your PAN card."]) }, 3);
+    await inv({ name: "Deepa Negi", mobile: "9568812345", category: "Nursing", department: "Nursing Services", designation: "Staff Nurse", joinDate: addDays(today, 2), expiresAt: new Date(addDays(today, -2) + "T23:59:59+05:30"), history: hist(["Pooja Kothari", "sent link", addDays(today, -9)]) });
+    await inv({ name: "Dr. Isha Nautiyal", mobile: "9876501234", category: "Teaching faculty", department: "Physiology", designation: "Assistant Professor", joinDate: today, status: "accepted", tokenHash: null, employeeId: isha, submittedAt: new Date(addDays(today, -7) + "T20:00:00+05:30"),
+      checks: { about: true, contact: true, ids: true, edu: true, docs: true }, history: hist(["Pooja Kothari", "sent link", addDays(today, -10)], ["Dr. Isha Nautiyal", "submitted", addDays(today, -7)], ["Pooja Kothari", `approved as ${isha}`, addDays(today, -6)]) }, 7);
+    const ishaPhoto = (await tx.select({ id: schema.files.id }).from(schema.files).where(sql`employee_id = ${isha} and kind ilike '%photo%'`))[0];
+    if (ishaPhoto) await tx.update(schema.employees).set({ photoFileId: ishaPhoto.id }).where(sql`id = ${isha}`);
 
     /* a believable change log */
     const A = (d: string, t: string, w: string, x: string) => ({ at: new Date(`${d}T${t}:00+05:30`), who: w, action: x });

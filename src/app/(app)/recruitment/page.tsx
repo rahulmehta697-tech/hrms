@@ -1,7 +1,7 @@
 import { asc, desc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { requirePerm } from "@/lib/auth";
-import { activeList } from "@/lib/settings";
+import { requirePerm, can } from "@/lib/auth";
+import { activeList, activeRows } from "@/lib/settings";
 import { barFor } from "@/lib/datasets";
 import { STAGES } from "@/lib/config";
 import { addCandidate, addRequisition, moveCandidate, setRequisitionStatus, startOnboarding } from "@/app/actions/hr";
@@ -16,6 +16,8 @@ export default async function Recruitment({ searchParams }: { searchParams: Prom
   const cur = reqs.find((r) => r.id === sp.r) || reqs.find((r) => r.status === "Open") || reqs[0];
   const cands = cur ? await db().select().from(schema.candidates).where(eq(schema.candidates.requisitionId, cur.id)).orderBy(asc(schema.candidates.name)) : [];
   const bar = await barFor(u, "candidates");
+  const canEmp = await can(u, "employees");
+  const catOf = Object.fromEntries((await activeRows("desig")).map((r) => [String(r.data[0]), String(r.data[1] || "")]));
   const move = (id: number, stage: number, label: string, cls = "btn sm") => <form action={moveCandidate}><input type="hidden" name="id" value={id} /><input type="hidden" name="stage" value={stage} /><button className={cls} type="submit">{label}</button></form>;
   return (
     <>
@@ -40,7 +42,9 @@ export default async function Recruitment({ searchParams }: { searchParams: Prom
           <div className="col" key={s}><h3><span>{s}</span><span className="muted num">{cs.length}</span></h3>
             {cs.map((c) => <div className="cand" key={c.id}><b>{c.name}</b><small>{c.details || "—"}{c.mobile ? ` · ${c.mobile}` : ""}</small>
               <div className="row" style={{ gap: 4 }}>{si < 4 && move(c.id, si + 1, `→ ${STAGES[si + 1]}`)}{move(c.id, -1, "Not selected", "btn sm danger")}</div>
-              {si === 4 && <form action={startOnboarding} className="row" style={{ gap: 4 }}><input type="hidden" name="id" value={c.id} /><input className="mini" type="date" name="joinDate" aria-label="Joining date" /><button className="btn sm primary" type="submit">Start onboarding</button></form>}
+              {si === 4 && (canEmp
+                ? <a className="btn sm primary" href={`/joiners?new=1&name=${encodeURIComponent(c.name)}&mobile=${encodeURIComponent(c.mobile)}&desig=${encodeURIComponent(cur.title)}&dept=${encodeURIComponent(cur.department)}${catOf[cur.title] ? "&cat=" + encodeURIComponent(catOf[cur.title]) : ""}#invite`}>Send joining form</a>
+                : <form action={startOnboarding} className="row" style={{ gap: 4 }}><input type="hidden" name="id" value={c.id} /><input className="mini" type="date" name="joinDate" aria-label="Joining date" /><button className="btn sm primary" type="submit">Start onboarding</button></form>)}
             </div>)}</div>); })}</div></div>
         {cands.some((c) => c.stage < 0) && <p className="hint">Not selected: {cands.filter((c) => c.stage < 0).map((c) => c.name).join(", ")}</p>}
         <form action={addCandidate} className="row" style={{ marginTop: 12, alignItems: "end" }}>

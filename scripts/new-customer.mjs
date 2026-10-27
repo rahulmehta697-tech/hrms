@@ -61,8 +61,9 @@ console.log(`   Neon project ${neon.project?.id || "(dry run)"} in ${region}`);
 // 3. Vercel project with environment variables
 console.log("3. Creating Vercel project…");
 const setupKey = randomBytes(18).toString("base64url");
+const dataKey = randomBytes(32).toString("base64url");
 const targets = ["production", "preview"];
-const vars = { DATABASE_URL: pooled, DATABASE_URL_UNPOOLED: direct, SETUP_KEY: setupKey, LICENSE_KEY: licenceKey, PRODUCT_NAME: env.PRODUCT_NAME, PRODUCT_URL: env.PRODUCT_URL, PRODUCT_SUPPORT: env.PRODUCT_SUPPORT };
+const vars = { DATABASE_URL: pooled, DATABASE_URL_UNPOOLED: direct, SETUP_KEY: setupKey, DATA_KEY: dataKey, LICENSE_KEY: licenceKey, PRODUCT_NAME: env.PRODUCT_NAME, PRODUCT_URL: env.PRODUCT_URL, PRODUCT_SUPPORT: env.PRODUCT_SUPPORT };
 const environmentVariables = Object.entries(vars).filter(([, v]) => v).map(([key, value]) => ({ key, value, target: targets, type: "encrypted" }));
 const vp = await call(`https://api.vercel.com/v11/projects${team}`, "POST", { name: project, framework: "nextjs", gitRepository: { type: "github", repo: env.GITHUB_REPO }, environmentVariables }, env.VERCEL_TOKEN);
 console.log(`   Vercel project ${vp.id || "(dry run)"}`);

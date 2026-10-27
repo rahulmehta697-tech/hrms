@@ -7,6 +7,8 @@ import { balances, getEmployee, salaryRules } from "@/lib/logic";
 import { fdt, inr } from "@/lib/dates";
 import { setSalary } from "@/app/actions/hr";
 import EmpForm from "@/components/EmpForm";
+import RevealAadhaar from "@/components/RevealAadhaar";
+import { filesOf } from "@/lib/joiners";
 import { Flash, Head, Pill } from "@/components/ui";
 
 export default async function EmployeePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string>> }) {
@@ -23,6 +25,8 @@ export default async function EmployeePage({ params, searchParams }: { params: P
   const comps = await activeRows("sal");
   const { kind, rule } = await salaryRules();
   const bal = await balances(e.id, e.category);
+  const docs = await filesOf({ employeeId: e.id });
+  const kb = (n: number) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
   return (
     <>
       <Head title={e.name} sub={<><span className="mono">{org.prefix}-{e.id}</span> · {e.designation} · {e.department}</>}><a className="btn sm" href="/employees">Back to list</a></Head>
@@ -30,6 +34,11 @@ export default async function EmployeePage({ params, searchParams }: { params: P
       <div className="grid g3">
         <div className="card"><h3>Portal login</h3>{login ? <div className="list"><div><span className="muted">Status</span><Pill s={login.status} /></div><div><span className="muted">Last sign-in</span><span>{fdt(login.lastLogin, org.tz)}</span></div></div> : <p className="muted" style={{ margin: 0 }}>No login yet. The Master Admin creates logins under Users & passwords.</p>}</div>
         <div className="card" style={{ gridColumn: "span 2" }}><h3>Leave balance · {bal.year.label}</h3><div className="bal">{bal.rows.map((r) => <div key={r.code}><b>{r.available}</b><small>{r.name}</small></div>)}</div></div>
+      </div>
+      <div className="card"><div className="row between" style={{ marginBottom: 12 }}><h2 style={{ margin: 0 }}>Documents</h2>{e.aadhaarLast4 && <div className="row" style={{ gap: 8 }}><span className="muted">Aadhaar</span><RevealAadhaar id={e.id} last4={e.aadhaarLast4} /></div>}</div>
+        {docs.length ? <div className="vdocs" style={{ padding: 0 }}>{docs.map((f) => (
+          <a key={f.id} className="vdoc" href={`/api/files/${f.id}`} target="_blank" rel="noopener"><div className="th">{f.mime.startsWith("image/") ? <img src={`/api/files/${f.id}`} alt="" loading="lazy" /> : "PDF"}</div><span><b>{f.kind}</b><br /><span className="hint">{kb(f.size)}</span></span></a>))}</div>
+          : <p className="muted" style={{ margin: 0 }}>No documents on file. Documents uploaded on the joining form appear here once the joiner is accepted.</p>}
       </div>
       <EmpForm e={e} opts={opts} isNew={false} prefix={org.prefix} />
       {pay && <div className="card" id="salary"><h2>Salary structure (monthly)</h2>

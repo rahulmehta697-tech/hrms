@@ -1,7 +1,8 @@
 import { saveEmployee } from "@/app/actions/hr";
 import { EMP_STATUS } from "@/lib/config";
+import { EMP_EXTRA, GENDERS, MARITAL, type EmpExtra } from "@/lib/empfields";
 
-type E = { id?: string; name?: string; designation?: string; department?: string; category?: string; doj?: string | null; status?: string; shift?: string | null; mobile?: string | null; email?: string | null; pan?: string | null; uan?: string | null; bankAccount?: string | null; ifsc?: string | null };
+type E = { id?: string; name?: string; designation?: string; department?: string; category?: string; doj?: string | null; status?: string; shift?: string | null; mobile?: string | null; email?: string | null; pan?: string | null; uan?: string | null; bankAccount?: string | null; ifsc?: string | null; aadhaarLast4?: string | null } & Partial<Record<EmpExtra["key"], string | null>>;
 
 export default function EmpForm({ e, opts, isNew, prefix }: { e: E; opts: { desig: string[]; dept: string[]; cat: string[]; shift: string[] }; isNew: boolean; prefix: string }) {
   const sel = (name: keyof E, list: string[], label: string, blank?: string) => (
@@ -32,6 +33,13 @@ export default function EmpForm({ e, opts, isNew, prefix }: { e: E; opts: { desi
         {inp("uan", "PF UAN")}
         {inp("bankAccount", "Bank account number")}
         {inp("ifsc", "IFSC")}
+      </div>
+      <h2 style={{ marginTop: 8 }}>Personal file</h2>
+      <div className="f">
+        <div className="fld"><label htmlFor="aadhaar">Aadhaar</label><input id="aadhaar" name="aadhaar" inputMode="numeric" autoComplete="off" placeholder={e.aadhaarLast4 ? `Saved: •••• •••• ${e.aadhaarLast4}` : "12 digits"} /><span className="hint">{e.aadhaarLast4 ? "Leave blank to keep the saved number." : "Stored encrypted."}</span></div>
+        {EMP_EXTRA.map((x) => x.key === "gender" || x.key === "maritalStatus"
+          ? <div className="fld" key={x.key}><label htmlFor={x.key}>{x.header}</label><select id={x.key} name={x.key} defaultValue={String(e[x.key] || "")}><option value="">Not given</option>{(x.key === "gender" ? GENDERS : MARITAL).map((o) => <option key={o}>{o}</option>)}</select></div>
+          : <div className={"fld" + (x.wide ? " wide" : "")} key={x.key}><label htmlFor={x.key}>{x.header}</label>{x.wide ? <textarea id={x.key} name={x.key} defaultValue={String(e[x.key] || "")} /> : <input id={x.key} name={x.key} type={x.date ? "date" : "text"} defaultValue={String(e[x.key] || "")} />}</div>)}
       </div>
       <div><button className="btn primary" type="submit">{isNew ? "Add employee" : "Save changes"}</button></div>
     </form>

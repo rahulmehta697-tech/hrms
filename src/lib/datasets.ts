@@ -7,6 +7,9 @@ import { attendanceGrid, leaveCounter, summarise } from "./logic";
 import { daysInMonth, fd, fdt, isDate, isTime, monthLabel, nowIn, MONTHS, pad } from "./dates";
 import type { SessionUser } from "./auth";
 import { employeeRoom } from "./license";
+import { EMP_EXTRA, GENDERS, MARITAL } from "./empfields";
+import { aadhaarOk, mobile10 } from "./joinform";
+import { encrypt } from "./secure";
 
 type Cell = string | number;
 export type Ctx = { u: SessionUser; p: URLSearchParams; prefix: string; tz: string };
@@ -22,6 +25,22 @@ type Imp = {
 export type DataSet = { title: (ctx: Ctx) => string; file: string; perm: Perm[] | "admin"; headers: (ctx: Ctx) => Promise<string[]> | string[]; rows: (ctx: Ctx) => Promise<Cell[][]>; imp?: Imp };
 
 const DATEH = "Date as DD-MM-YYYY or YYYY-MM-DD";
+const EMP_BASE = ["Employee ID", "Full name", "Designation", "Department", "Category", "Date of joining", "Status", "Shift", "Mobile", "Email", "PAN", "UAN", "Bank account", "IFSC"];
+/** Personal-file values from one import row (blank = null, so the saved value is kept). */
+function extra(o: Record<string, string | number>, ctx: Ctx) {
+  const out: Record<string, string | null> = {};
+  for (const x of EMP_EXTRA) {
+    let v = S(o[x.header]);
+    if (x.key === "gender") v = ci(GENDERS, v) || "";
+    if (x.key === "maritalStatus") v = ci(MARITAL, v) || "";
+    if (x.key === "emergencyMobile") v = mobile10(v) || "";
+    if (x.key === "reportingTo") v = normId(v, ctx.prefix);
+    out[x.key] = v || null;
+  }
+  const a = S(o["Aadhaar"]).replace(/\D/g, "");
+  if (!/X/i.test(S(o["Aadhaar"])) && aadhaarOk(a)) { out.aadhaarEnc = encrypt(a); out.aadhaarLast4 = a.slice(-4); } else { out.aadhaarEnc = null; out.aadhaarLast4 = null; }
+  return out;
+}
 const S = (v: Cell | undefined) => String(v ?? "").trim();
 const pid = (ctx: Ctx, id: string) => `${ctx.prefix}-${id}`;
 export function normId(v: Cell | undefined, prefix: string) {
@@ -52,12 +71,12 @@ function normMonth(v: Cell) {
 export const DATASETS: Record<string, DataSet> = {
   employees: {
     title: () => "Employee master", file: "employees", perm: ["employees"],
-    headers: () => ["Employee ID", "Full name", "Designation", "Department", "Category", "Date of joining", "Status", "Shift", "Mobile", "Email", "PAN", "UAN", "Bank account", "IFSC"],
-    rows: async (ctx) => (await db().select().from(schema.employees).orderBy(asc(schema.employees.id))).map((e) => [pid(ctx, e.id), e.name, e.designation, e.department, e.category, e.doj || "", e.status, e.shift || "", e.mobile || "", e.email || "", e.pan || "", e.uan || "", e.bankAccount || "", e.ifsc || ""]),
+    headers: () => [...EMP_BASE, "Aadhaar", ...EMP_EXTRA.map((x) => x.header)],
+    rows: async (ctx) => (await db().select().from(schema.employees).orderBy(asc(schema.employees.id))).map((e) => [pid(ctx, e.id), e.name, e.designation, e.department, e.category, e.doj || "", e.status, e.shift || "", e.mobile || "", e.email || "", e.pan || "", e.uan || "", e.bankAccount || "", e.ifsc || "", e.aadhaarLast4 ? `XXXX-XXXX-${e.aadhaarLast4}` : "", ...EMP_EXTRA.map((x) => { const v = e[x.key]; return x.key === "reportingTo" && v ? pid(ctx, v) : v || ""; })]),
     imp: {
-      headers: ["Employee ID", "Full name", "Designation", "Department", "Category", "Date of joining", "Status", "Shift", "Mobile", "Email", "PAN", "UAN", "Bank account", "IFSC"],
-      help: ["Category ID code + dash + number, e.g. F-1042. The institute prefix is optional. An existing ID updates that employee.", "Full name as it should appear on payslips", "One of the active designations", "One of the active departments", "One of the active categories", DATEH, "Active, Probation, On notice or Exited (blank = Active)", "One of the active shifts (blank = default shift)", "10-digit mobile", "Email", "PAN (optional)", "PF UAN (optional)", "Bank account number for salary (optional)", "IFSC (optional)"],
-      types: { "Date of joining": "date" }, required: ["Employee ID", "Full name", "Designation", "Department", "Category"],
+      headers: [...EMP_BASE, "Aadhaar", ...EMP_EXTRA.map((x) => x.header)],
+      help: ["Category ID code + dash + number, e.g. F-1042. The institute prefix is optional. An existing ID updates that employee.", "Full name as it should appear on payslips", "One of the active designations", "One of the active departments", "One of the active categories", DATEH, "Active, Probation, On notice or Exited (blank = Active)", "One of the active shifts (blank = default shift)", "10-digit mobile", "Email", "PAN (optional)", "PF UAN (optional)", "Bank account number for salary (optional)", "IFSC (optional)", "12-digit Aadhaar (optional). Stored encrypted; exports show only the last 4 digits. A masked value (XXXX-XXXX-1234) keeps the saved number.", ...EMP_EXTRA.map((x) => x.help)],
+      types: { "Date of joining": "date", "Date of birth": "date" }, required: ["Employee ID", "Full name", "Designation", "Department", "Category"],
       prepare: async () => ({ desig: await act("desig"), dept: await act("dept"), cat: await act("cat"), codes: await act("cat", 1), shift: await act("shift") }),
       validate: (o, p, ctx) => {
         const id = normId(o["Employee ID"], ctx.prefix);
@@ -70,6 +89,12 @@ export const DATASETS: Record<string, DataSet> = {
         if (S(o["Status"]) && !ci(EMP_STATUS, o["Status"])) return "Status should be Active, Probation, On notice or Exited";
         if (S(o["Shift"]) && !ci(p.shift, o["Shift"])) return `Shift “${S(o["Shift"])}” is not an active shift`;
         if (S(o["Mobile"]) && S(o["Mobile"]).replace(/\D/g, "").length < 10) return "Mobile should have 10 digits";
+        const aad = S(o["Aadhaar"]);
+        if (aad && !/X/i.test(aad) && !aadhaarOk(aad)) return "Aadhaar is not a valid 12-digit Aadhaar number";
+        if (S(o["Date of birth"]) && !isDate(o["Date of birth"])) return "Date of birth is not a valid date";
+        if (S(o["Gender"]) && !ci(GENDERS, o["Gender"])) return "Gender should be Female, Male or Other";
+        if (S(o["Marital status"]) && !ci(MARITAL, o["Marital status"])) return "Marital status should be Single, Married or Other";
+        if (S(o["Emergency mobile"]) && !mobile10(o["Emergency mobile"])) return "Emergency mobile should have 10 digits";
         return "";
       },
       commit: async (list, p, ctx) => {
@@ -77,14 +102,16 @@ export const DATASETS: Record<string, DataSet> = {
         const vals = new Map<string, typeof schema.employees.$inferInsert>();
         for (const o of list) {
           const id = normId(o["Employee ID"], ctx.prefix);
-          vals.set(id, { id, name: S(o["Full name"]), designation: ci(p.desig, o["Designation"])!, department: ci(p.dept, o["Department"])!, category: ci(p.cat, o["Category"])!, doj: S(o["Date of joining"]) || null, status: ci(EMP_STATUS, o["Status"]) || "Active", shift: ci(p.shift, o["Shift"]) || null, mobile: S(o["Mobile"]) || null, email: S(o["Email"]) || null, pan: S(o["PAN"]) || null, uan: S(o["UAN"]) || null, bankAccount: S(o["Bank account"]) || null, ifsc: S(o["IFSC"]).toUpperCase() || null });
+          vals.set(id, { id, name: S(o["Full name"]), designation: ci(p.desig, o["Designation"])!, department: ci(p.dept, o["Department"])!, category: ci(p.cat, o["Category"])!, doj: S(o["Date of joining"]) || null, status: ci(EMP_STATUS, o["Status"]) || "Active", shift: ci(p.shift, o["Shift"]) || null, mobile: S(o["Mobile"]) || null, email: S(o["Email"]) || null, pan: S(o["PAN"]) || null, uan: S(o["UAN"]) || null, bankAccount: S(o["Bank account"]) || null, ifsc: S(o["IFSC"]).toUpperCase() || null, ...extra(o, ctx) });
         }
         const all = [...vals.values()];
         const newActive = all.filter((v) => !existing.has(v.id) && v.status !== "Exited").length;
         const room = newActive ? await employeeRoom(newActive) : "";
         if (room) throw new Error(room);
         const ex = (c: string) => sql.raw(`excluded.${c}`);
-        for (let i = 0; i < all.length; i += 500) await db().insert(schema.employees).values(all.slice(i, i + 500)).onConflictDoUpdate({ target: schema.employees.id, set: { name: ex("name"), designation: ex("designation"), department: ex("department"), category: ex("category"), doj: ex("doj"), status: ex("status"), shift: ex("shift"), mobile: ex("mobile"), email: ex("email"), pan: ex("pan"), uan: ex("uan"), bankAccount: ex("bank_account"), ifsc: ex("ifsc") } });
+        // Personal-file columns: a blank cell keeps what is already saved, so an older template never wipes them.
+        const keep = Object.fromEntries([...EMP_EXTRA.map((x) => [x.key, x.col]), ["aadhaarEnc", "aadhaar_enc"], ["aadhaarLast4", "aadhaar_last4"]].map(([k, c]) => [k, sql.raw(`coalesce(excluded.${c}, employees.${c})`)]));
+        for (let i = 0; i < all.length; i += 500) await db().insert(schema.employees).values(all.slice(i, i + 500)).onConflictDoUpdate({ target: schema.employees.id, set: { name: ex("name"), designation: ex("designation"), department: ex("department"), category: ex("category"), doj: ex("doj"), status: ex("status"), shift: ex("shift"), mobile: ex("mobile"), email: ex("email"), pan: ex("pan"), uan: ex("uan"), bankAccount: ex("bank_account"), ifsc: ex("ifsc"), ...keep } });
         await db().execute(sql`update users set name = e.name from employees e where users.login = upper(e.id) and users.name <> e.name`);
         const added = all.filter((v) => !existing.has(v.id)).length, updated = all.length - added;
         return `${added} employee${added === 1 ? "" : "s"} added, ${updated} updated. Create logins for new employees from Users & passwords.`;

@@ -25,7 +25,7 @@ export async function setupSteps(u: SessionUser) {
     ...(u.role === "admin" ? [{ title: "Licence", detail: lic.message, href: "/admin/licence", done: lic.state === "valid" || lic.state === "expiring" }] : []),
     master("cat"), master("dept"), master("desig"), master("leave"), master("shift"), master("hol"), master("src"),
     { ...master("sal"), detail: n("sal") ? `${n("sal")} active${basic ? "" : ". No component has the rule “Basic pay” yet, so PF cannot be calculated."}` : master("sal").detail },
-    master("docs", true),
+    master("jdocs", true), master("docs", true),
     { title: "Attendance rules", detail: rules.start ? `Tracking from ${rules.start}${rules.thrCat ? `, minimum ${rules.thr}% for ${rules.thrCat}` : ""}` : "Set the date attendance tracking starts.", href: "/admin/rules", done: !!rules.start },
     { title: "Approval workflows", detail: "Check who approves leave and regularisation.", href: "/admin/workflows", done: true, optional: true },
     { title: "Employees", detail: emps ? `${emps.toLocaleString("en-IN")} employees` : "Import your employee list from Excel.", href: "/employees", done: emps > 0 },

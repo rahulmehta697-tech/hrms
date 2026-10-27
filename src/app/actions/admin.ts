@@ -19,7 +19,7 @@ const s = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
 export async function saveOrg(fd: FormData) {
   const u = await requirePerm("masters");
   const { org } = await getSettings();
-  const next = { ...org, name: s(fd, "name") || org.name, short: s(fd, "short").slice(0, 12), addr: s(fd, "addr"), prefix: s(fd, "prefix").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8) || org.prefix, fy: s(fd, "fy") === "January – December" ? "January – December" : "April – March", weekoff: WEEKOFF_OPTIONS.includes(s(fd, "weekoff")) ? s(fd, "weekoff") : org.weekoff, tz: s(fd, "tz") || org.tz };
+  const next = { ...org, name: s(fd, "name") || org.name, short: s(fd, "short").slice(0, 12), addr: s(fd, "addr"), prefix: s(fd, "prefix").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8) || org.prefix, fy: s(fd, "fy") === "January – December" ? "January – December" : "April – March", weekoff: WEEKOFF_OPTIONS.includes(s(fd, "weekoff")) ? s(fd, "weekoff") : org.weekoff, tz: s(fd, "tz") || org.tz, hrPhone: s(fd, "hrPhone").slice(0, 40), hrEmail: s(fd, "hrEmail").slice(0, 80) };
   const logo = s(fd, "logo"), png = s(fd, "logoPng");
   if (logo) {
     if (!/^data:image\/(png|jpeg|webp|svg\+xml);base64,/.test(logo) || logo.length > 700_000) go("/admin/institute", "err", "Use a PNG, JPG, WebP or SVG logo under 500 KB.");

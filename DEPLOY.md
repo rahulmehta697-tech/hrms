@@ -22,6 +22,7 @@
 | Name | Value |
 |---|---|
 | `SETUP_KEY` | A long random phrase, used once on the first-run page |
+| `DATA_KEY` | A random secret (`openssl rand -base64 32`) that encrypts Aadhaar numbers. Set it before the first joiner and never change it. |
 | `LICENSE_KEY` | The customer's key from `node scripts/license.mjs issue …` (optional; it can also be pasted in the portal) |
 | `PRODUCT_NAME`, `PRODUCT_URL`, `PRODUCT_SUPPORT` | Optional; defaults come from `src/lib/product.ts` |
 
@@ -47,9 +48,10 @@ Everything starts empty. The Master Admin's **Setup checklist** lists each step 
    - Holidays
    - Attendance sources
    - Salary components
+   - Joining documents (what new joiners upload on the joining form)
    - Onboarding checklist
 4. **Attendance rules:** the date tracking starts, and an optional minimum attendance %.
-5. **Employees → Import:** the full staff list. Re-importing updates people instead of duplicating them.
+5. **Employees → Import:** the full staff list (the master dump of existing records). The template also has personal-file columns: Aadhaar, date of birth, gender, family, addresses, emergency contact, qualification, registration, reporting manager. Re-importing updates people instead of duplicating them; a blank personal-file cell keeps what is already saved.
 6. **Departments:** fill in each **Head (employee ID)**. Heads approve their department's requests.
 7. **Users & passwords → Create logins:** done in batches of 200. Each batch downloads an Excel file of temporary passwords; staff choose their own at first sign-in. Set roles for HR, Accounts and Management users.
 8. **Leave register → Opening balances**, and **Payroll → Salary structures**: import both from Excel.
@@ -69,6 +71,16 @@ Each salary component has a **Rule** that tells payroll how to treat it, whateve
 
 In a salary structure, put the full-month amount for fixed components and `1` for Auto ones. Ask each customer's accounts team to compare the first two months against their current payroll, and to confirm the statutory rates are current.
 
+## New joiners
+
+From now on HR adds new staff through **New joiners**, not by typing records:
+
+1. **Invite a new joiner:** name, role, department, joining date. HR gets a one-time link to send by WhatsApp, email or copy-paste. The link works for one submission and expires (3, 7, 14 or 30 days).
+2. The joiner opens the link on their phone, fills six short steps and uploads the documents listed under **Joining documents**. Answers save at every step.
+3. HR opens the submission, ticks each section as checked and either **approves** it (creates the employee, a staff login with a temporary password, and the joining checklist), **asks for corrections** (sends a fresh link with a note; answers stay filled in) or **rejects** it.
+
+Fill in **Organisation profile → HR office contact** so joiners know whom to call. Documents are stored in the database (photos are shrunk on the phone before upload; 4 MB per file).
+
 ## Monthly routine for the customer
 
 - **Attendance:** import each device's punch file on **Attendance register → Import**. Duplicates are skipped.
@@ -85,7 +97,8 @@ In a salary structure, put the full-month amount for fixed components and `1` fo
 - Neon keeps a restore history; check how far back the plan allows.
 - Encourage each customer to export Employees, Leave register and the Payroll register monthly.
 - Passwords are stored with bcrypt; sessions expire after the time set in the password policy.
-- Every change is recorded in the **Change log**.
+- Every change is recorded in the **Change log**, including each time HR views a full Aadhaar number.
+- Aadhaar numbers are encrypted with `DATA_KEY`. Keep a copy of the key with the customer's records; if it changes, saved Aadhaar numbers can no longer be read.
 
 ## Troubleshooting
 

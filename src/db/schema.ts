@@ -1,4 +1,6 @@
-import { pgTable, text, integer, boolean, jsonb, serial, timestamp, date, numeric, primaryKey, index, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, boolean, jsonb, serial, timestamp, date, numeric, primaryKey, index, uniqueIndex, customType } from "drizzle-orm/pg-core";
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => "bytea" });
 
 /** Key/value settings: institute profile, password policy, attendance rules, workflows, access matrix. */
 export const settings = pgTable("settings", {
@@ -16,6 +18,8 @@ export const masters = pgTable("masters", {
   sort: integer("sort").default(0).notNull(),
 }, (t) => [index("masters_kind_idx").on(t.kind)]);
 
+export type Experience = { employer: string; role: string; from: string; to: string };
+
 export const employees = pgTable("employees", {
   id: text("id").primaryKey(), // e.g. F-1042 (category code + number); the institute prefix is added for display and login
   name: text("name").notNull(),
@@ -31,6 +35,27 @@ export const employees = pgTable("employees", {
   uan: text("uan"),
   bankAccount: text("bank_account"),
   ifsc: text("ifsc"),
+  // Personal file. Aadhaar is stored encrypted (aadhaarEnc) with only the last four digits in clear.
+  dob: date("dob", { mode: "string" }),
+  gender: text("gender"),
+  fatherName: text("father_name"),
+  bloodGroup: text("blood_group"),
+  maritalStatus: text("marital_status"),
+  address: text("address"),
+  permAddress: text("perm_address"),
+  emergencyName: text("emergency_name"),
+  emergencyRelation: text("emergency_relation"),
+  emergencyMobile: text("emergency_mobile"),
+  aadhaarEnc: text("aadhaar_enc"),
+  aadhaarLast4: text("aadhaar_last4"),
+  qualification: text("qualification"),
+  institution: text("institution"),
+  qualYear: text("qual_year"),
+  regCouncil: text("reg_council"),
+  regNo: text("reg_no"),
+  reportingTo: text("reporting_to"),
+  experience: jsonb("experience").$type<Experience[]>(),
+  photoFileId: integer("photo_file_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [index("emp_dept_idx").on(t.department), index("emp_cat_idx").on(t.category)]);
 
@@ -166,6 +191,45 @@ export const joiners = pgTable("joiners", {
   employeeId: text("employee_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+/** One-time joining-form links. Only a hash of the link token is stored; a new link replaces the old one. */
+export type JoinerStatus = "sent" | "opened" | "submitted" | "corrections" | "accepted" | "rejected" | "cancelled";
+export const joinerInvites = pgTable("joiner_invites", {
+  id: serial("id").primaryKey(),
+  tokenHash: text("token_hash"),
+  name: text("name").notNull(),
+  mobile: text("mobile").default("").notNull(),
+  email: text("email").default("").notNull(),
+  category: text("category").notNull(),
+  department: text("department").notNull(),
+  designation: text("designation").notNull(),
+  shift: text("shift"),
+  joinDate: date("join_date", { mode: "string" }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  status: text("status").$type<JoinerStatus>().default("sent").notNull(),
+  data: jsonb("data").$type<Record<string, unknown>>().default({}).notNull(),
+  checks: jsonb("checks").$type<Record<string, boolean>>().default({}).notNull(),
+  note: text("note").default("").notNull(),
+  employeeId: text("employee_id"),
+  history: jsonb("history").$type<Step[]>().default([]).notNull(),
+  openedAt: timestamp("opened_at", { withTimezone: true }),
+  submittedAt: timestamp("submitted_at", { withTimezone: true }),
+  createdBy: text("created_by").default("").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [uniqueIndex("jinv_token_idx").on(t.tokenHash), index("jinv_status_idx").on(t.status)]);
+
+/** Uploaded documents: from the joining form (inviteId) and, once accepted, linked to the employee. */
+export const files = pgTable("files", {
+  id: serial("id").primaryKey(),
+  inviteId: integer("invite_id"),
+  employeeId: text("employee_id"),
+  kind: text("kind").notNull(),
+  fileName: text("file_name").notNull(),
+  mime: text("mime").notNull(),
+  size: integer("size").notNull(),
+  data: bytea("data").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [index("files_inv_idx").on(t.inviteId), index("files_emp_idx").on(t.employeeId)]);
 
 export const audit = pgTable("audit", {
   id: serial("id").primaryKey(),

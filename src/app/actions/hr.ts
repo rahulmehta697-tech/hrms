@@ -10,6 +10,9 @@ import { isDate, monthLabel } from "@/lib/dates";
 import { log } from "@/lib/audit";
 import { employeeRoom } from "@/lib/license";
 import { isShowcase } from "@/lib/demo";
+import { EMP_EXTRA, GENDERS, MARITAL } from "@/lib/empfields";
+import { aadhaarOk, mobile10 } from "@/lib/joinform";
+import { decrypt, encrypt } from "@/lib/secure";
 
 const go = (path: string, k: "ok" | "err", m: string): never => redirect(`${path}${path.includes("?") ? "&" : "?"}${k}=${encodeURIComponent(m)}`);
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
@@ -23,7 +26,16 @@ export async function saveEmployee(fd: FormData) {
   if (id.startsWith(org.prefix.toUpperCase() + "-")) id = id.slice(org.prefix.length + 1);
   const back = isNew ? "/employees/new" : `/employees/${id}`;
   if (!/^[A-Z0-9]{1,4}-[A-Z0-9]{1,8}$/.test(id)) go(back, "err", "Employee ID should look like F-1042 (category code, dash, number).");
-  const v = { name: s(fd, "name"), designation: s(fd, "designation"), department: s(fd, "department"), category: s(fd, "category"), doj: s(fd, "doj") || null, status: s(fd, "status") || "Active", shift: s(fd, "shift") || null, mobile: s(fd, "mobile") || null, email: s(fd, "email") || null, pan: s(fd, "pan").toUpperCase() || null, uan: s(fd, "uan") || null, bankAccount: s(fd, "bankAccount") || null, ifsc: s(fd, "ifsc").toUpperCase() || null };
+  const v: Partial<typeof schema.employees.$inferInsert> & { name: string; designation: string; department: string; category: string; status: string } = { name: s(fd, "name"), designation: s(fd, "designation"), department: s(fd, "department"), category: s(fd, "category"), doj: s(fd, "doj") || null, status: s(fd, "status") || "Active", shift: s(fd, "shift") || null, mobile: s(fd, "mobile") || null, email: s(fd, "email") || null, pan: s(fd, "pan").toUpperCase() || null, uan: s(fd, "uan") || null, bankAccount: s(fd, "bankAccount") || null, ifsc: s(fd, "ifsc").toUpperCase() || null };
+  const x: Record<string, string | null> = Object.fromEntries(EMP_EXTRA.map((f) => [f.key, s(fd, f.key).slice(0, 400) || null]));
+  if (x.dob && !isDate(x.dob)) go(back, "err", "Date of birth is not valid.");
+  if (x.gender && !GENDERS.includes(x.gender)) x.gender = null;
+  if (x.maritalStatus && !MARITAL.includes(x.maritalStatus)) x.maritalStatus = null;
+  if (x.emergencyMobile) { x.emergencyMobile = mobile10(x.emergencyMobile) || null; if (!x.emergencyMobile) go(back, "err", "Emergency mobile should have 10 digits."); }
+  if (x.reportingTo) x.reportingTo = x.reportingTo.toUpperCase().replace(new RegExp(`^${org.prefix.toUpperCase()}-`), "");
+  const aad = s(fd, "aadhaar").replace(/\D/g, "");
+  if (aad && !aadhaarOk(aad)) go(back, "err", "That is not a valid Aadhaar number.");
+  Object.assign(v, x, aad ? { aadhaarEnc: encrypt(aad), aadhaarLast4: aad.slice(-4) } : {});
   if (!v.name) go(back, "err", "Full name is required.");
   if (!(await activeList("desig")).includes(v.designation)) go(back, "err", "Pick a designation from the list.");
   if (!(await activeList("dept")).includes(v.department)) go(back, "err", "Pick a department from the list.");
@@ -35,7 +47,7 @@ export async function saveEmployee(fd: FormData) {
     const ex = await db().select({ id: schema.employees.id }).from(schema.employees).where(eq(schema.employees.id, id));
     if (ex.length) go(back, "err", `Employee ID ${id} already exists.`);
     if (v.status !== "Exited") { const room = await employeeRoom(1); if (room) go(back, "err", room); }
-    await db().insert(schema.employees).values({ id, ...v });
+    await db().insert(schema.employees).values({ ...v, id });
     await log(who(u), `Added employee ${id} ${v.name}`);
   } else {
     const old = (await db().select({ st: schema.employees.status }).from(schema.employees).where(eq(schema.employees.id, id)))[0];
@@ -186,4 +198,14 @@ export async function removeJoiner(fd: FormData) {
   await db().delete(schema.joiners).where(eq(schema.joiners.id, id));
   await log(who(u), `Removed joiner #${id} from onboarding`);
   go("/onboarding", "ok", "Removed from onboarding.");
+}
+
+/** Show the full Aadhaar number to HR. Every look is written to the change log. */
+export async function revealAadhaar(_: string | null, fd: FormData): Promise<string | null> {
+  const u = await requirePerm("employees");
+  const id = s(fd, "id");
+  const e = (await db().select({ enc: schema.employees.aadhaarEnc, name: schema.employees.name }).from(schema.employees).where(eq(schema.employees.id, id)))[0];
+  const a = decrypt(e?.enc);
+  await log(who(u), `Viewed full Aadhaar of ${id} ${e?.name || ""}`);
+  return a ? a.replace(/(\d{4})(?=\d)/g, "$1 ") : "Could not read the saved number (the data key may have changed).";
 }

@@ -32,6 +32,9 @@ export const MASTERS: MasterDef[] = [
   { kind: "docs", title: "Onboarding checklist", desc: "Steps every new joiner goes through. “Required for” limits a step to one category.",
     cols: [{ key: "name", label: "Checklist item", required: true }, { key: "for", label: "Required for", type: "sel:All|@cat" }],
     hint: "e.g. Documents verified, ID card issued" },
+  { kind: "jdocs", title: "Joining documents", desc: "Documents new joiners upload on the joining form. “Required” ones must be uploaded before they can submit.",
+    cols: [{ key: "name", label: "Document", required: true }, { key: "for", label: "Asked from", type: "sel:All|@cat" }, { key: "req", label: "Required", type: "sel:Yes|No" }],
+    hint: "e.g. Passport-size photo (Yes), Aadhaar card (Yes), Experience letter (No)" },
 ];
 export const SAL_RULES = ["Fixed amount", "Basic pay", "Auto: employee PF", "Auto: employee ESI", "Auto: employer PF", "Income tax (TDS)"] as const;
 export const masterDef = (kind: string) => MASTERS.find((m) => m.kind === kind);
@@ -57,7 +60,7 @@ export const PERM_KEYS = Object.keys(PERMS) as Perm[];
 export const APPROVERS = ["Reporting HOD", "HR Office", "Accounts", "Management"] as const;
 export const APPROVER_ROLE: Record<string, Role | "hodOf"> = { "Reporting HOD": "hodOf", "HR Office": "hr", Accounts: "accounts", Management: "management" };
 
-export type Org = { name: string; short: string; addr: string; prefix: string; fy: string; weekoff: string; tz: string; logo: string | null; logoPng: string | null };
+export type Org = { name: string; short: string; addr: string; prefix: string; fy: string; weekoff: string; tz: string; logo: string | null; logoPng: string | null; hrPhone?: string; hrEmail?: string };
 export type Policy = { min: number; complex: boolean; expiry: number; lock: number; session: number };
 export type Rules = { thr: number; thrCat: string; merge: string; half: number; countOffs: boolean; start: string };
 export type Flow = { key: string; title: string; chain: string[] };

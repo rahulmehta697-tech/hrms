@@ -25,6 +25,10 @@ export default async function Institute({ searchParams }: { searchParams: Promis
           <div className="fld"><label htmlFor="weekoff">Weekly off</label><select id="weekoff" name="weekoff" defaultValue={org.weekoff}>{WEEKOFF_OPTIONS.map((w) => <option key={w}>{w}</option>)}</select></div>
           <div className="fld"><label htmlFor="tz">Time zone</label><select id="tz" name="tz" defaultValue={org.tz}><option>Asia/Kolkata</option><option>Asia/Dubai</option><option>Asia/Kathmandu</option><option>Asia/Dhaka</option><option>UTC</option></select></div>
         </div></div>
+        <div className="card"><h2>HR office contact</h2><p className="hint" style={{ margin: "-6px 0 12px" }}>Shown to new joiners on the joining form, so they know whom to call.</p><div className="f">
+          <div className="fld"><label htmlFor="hrPhone">Phone</label><input id="hrPhone" name="hrPhone" type="tel" defaultValue={org.hrPhone || ""} /></div>
+          <div className="fld"><label htmlFor="hrEmail">Email</label><input id="hrEmail" name="hrEmail" type="email" defaultValue={org.hrEmail || ""} /></div>
+        </div></div>
         <div><button className="btn primary" type="submit">Save</button></div>
       </form>
     </>

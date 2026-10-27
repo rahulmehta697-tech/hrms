@@ -45,6 +45,7 @@ export default async function SettingsHub({ searchParams }: { searchParams: Prom
     ] },
     { title: "Payroll and joining", icon: "payroll", desc: "Pay components and new-joiner steps.", rows: [
       { href: "/admin/masters/sal", label: "Salary components", ...cnt("sal") },
+      { href: "/admin/masters/jdocs", label: "Joining documents", ...(n("jdocs") ? { meta: String(n("jdocs")) } : { todo: "Optional" }) },
       { href: "/admin/masters/docs", label: "Onboarding checklist", ...(n("docs") ? { meta: String(n("docs")) } : { todo: "Optional" }) },
     ] },
     ...(admin && lic ? [{ title: "Licence", icon: "shield", desc: "This copy's licence and limits.", rows: [
