@@ -8,7 +8,7 @@ export function Mark({ org, big }: { org: Org; big?: boolean }) {
 export function Head({ title, sub, tag, children }: { title: string; sub?: React.ReactNode; tag?: string; children?: React.ReactNode }) {
   return (
     <div className="head">
-      <div>{tag && <span className="pill p-adm">{tag}</span>}<h1 style={tag ? { marginTop: 6 } : undefined}>{title}</h1>{sub && <p>{sub}</p>}</div>
+      <div>{tag && <a className="crumb-link" href="/settings"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>Settings{tag !== "Settings" ? ` · ${tag}` : ""}</a>}<h1 style={tag ? { marginTop: 4 } : undefined}>{title}</h1>{sub && <p>{sub}</p>}</div>
       {children}
     </div>
   );
