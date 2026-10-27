@@ -89,3 +89,34 @@ New installations start **empty**. The customer's Master Admin sees a **Setup ch
 - **Hosted customers:** push to `main`. Every customer's Vercel project redeploys, and database changes apply automatically during the build.
 - **On-premise customers:** send the new code. They run `docker compose up -d --build`, and database changes apply when the container starts. Data is kept.
 - Before pushing, run the app against a copy of real data (for example, a Neon branch) so a bad update doesn't reach every customer at once.
+
+## Your demo copy
+
+One deployment with `DEMO_MODE=1` is your shop window. Prospects try it, and when one buys you give them a clean copy (above).
+
+- **Sample data:** it fills itself with a fictional "Demo Institute of Medical Sciences":
+  - about 110 employees;
+  - two months of attendance from three sources;
+  - leave in every state;
+  - last month's payroll closed with payslips;
+  - recruitment and onboarding in progress.
+
+  All dates are relative to today, so it always looks current.
+- **Sign-in:** the sign-in page lists five demo accounts (Master Admin, HR Office, Head of department, Accounts, Staff) with one-click sign-in. Every account uses the password `Demo@1234`.
+- **Reset:** the data resets every night at 2:00 AM IST through Vercel Cron (`vercel.json`). The Master Admin can also press **Reset demo data now** before a meeting.
+- **Guard rails:**
+  - password changes and the password policy are switched off;
+  - wrong passwords never lock an account;
+  - the five demo accounts can't be disabled or reset;
+  - the licence can't be changed.
+
+**Environment variables for the demo project:**
+
+| Name | Value |
+|---|---|
+| `DATABASE_URL` / `DATABASE_URL_UNPOOLED` | Added by Vercel's Neon integration |
+| `DEMO_MODE` | `1` |
+| `CRON_SECRET` | Any long random text; Vercel sends it to the nightly reset |
+| `LICENSE_KEY` | A demo key, e.g. `node scripts/license.mjs issue --customer "Demo Institute of Medical Sciences" --employees 500 --expires 2028-12-31` |
+
+Never set `DEMO_MODE` on a customer's copy: it wipes the database every night.

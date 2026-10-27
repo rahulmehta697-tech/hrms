@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSettings, isSetUp } from "@/lib/settings";
+import { DEMO, DEMO_ACCOUNTS, DEMO_PASSWORD, DEMO_RESET_TIME, seedDemo } from "@/lib/demo";
 import { getUser } from "@/lib/auth";
 import { login } from "@/app/actions/auth";
 import Powered from "@/components/Powered";
@@ -8,7 +9,7 @@ import { Flash, Mark } from "@/components/ui";
 export const dynamic = "force-dynamic";
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
-  if (!(await isSetUp())) redirect("/setup");
+  if (!(await isSetUp())) { if (DEMO) await seedDemo(); else redirect("/setup"); }
   if (await getUser()) redirect("/");
   const sp = await searchParams;
   const { org, pol } = await getSettings();
@@ -31,10 +32,21 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             <Flash sp={sp} />
             <button className="btn primary" type="submit" style={{ justifyContent: "center" }}>Sign in</button>
             <a className="btn link" href="/login?forgot=1" style={{ alignSelf: "flex-start" }}>Forgot password?</a>
-            <p className="hint" style={{ margin: 0 }}>After {pol.lock} wrong passwords the login locks until the Master Admin unlocks it.</p>
+            {!DEMO && <p className="hint" style={{ margin: 0 }}>After {pol.lock} wrong passwords the login locks until the Master Admin unlocks it.</p>}
           </form>
         )}
       </div>
+      {DEMO && (
+        <div className="card stack" style={{ marginTop: 16 }}>
+          <div><span className="pill p-adm">Demo</span><h2 style={{ marginTop: 8 }}>Try it as any role</h2>
+            <p className="muted" style={{ margin: "4px 0 0" }}>This is a demo with a fictional institute and sample data. Pick a role to sign in. Every account uses the password <b className="mono" style={{ userSelect: "all" }}>{DEMO_PASSWORD}</b>. Changes you make are wiped every night at {DEMO_RESET_TIME}.</p></div>
+          <div className="list">{DEMO_ACCOUNTS.map((a) => (
+            <div key={a.login}>
+              <div style={{ minWidth: 0, flex: "1 1 200px" }}><b>{a.label}</b><div className="hint">{a.note} · <span className="mono">{a.login === "ADMIN" ? "admin" : `${org.prefix}-${a.login}`}</span></div></div>
+              <form action={login}><input type="hidden" name="login" value={a.login === "ADMIN" ? "admin" : `${org.prefix}-${a.login}`} /><input type="hidden" name="password" value={DEMO_PASSWORD} /><button className="btn sm primary" type="submit">Sign in</button></form>
+            </div>))}</div>
+        </div>
+      )}
       <div style={{ marginTop: 16 }}><Powered center /></div>
     </div>
   );

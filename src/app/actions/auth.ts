@@ -8,6 +8,9 @@ import { DEFAULTS } from "@/lib/config";
 import { checkPassword, endSession, getUser, hashPassword, normLogin, pwError, startSession, who } from "@/lib/auth";
 import { log } from "@/lib/audit";
 import { licenceStatus } from "@/lib/license";
+import { DEMO } from "@/lib/demo";
+
+const DEMO_PW = "Password changes are switched off in this demo, so every visitor can use the same sign-in details.";
 
 const q = (path: string, k: "ok" | "err", m: string, extra = "") => `${path}?${k}=${encodeURIComponent(m)}${extra}`;
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
@@ -23,6 +26,7 @@ export async function login(fd: FormData) {
   if (u.status === "Disabled") back("This login is disabled. Contact the HR office.");
   if (u.status === "Locked") back(`This login is locked after ${pol.lock} wrong attempts. Ask the Master Admin to unlock it.`);
   if (!(await checkPassword(pw, u.passwordHash))) {
+    if (DEMO) back("Wrong password. Every demo account uses the password shown below.");
     const failed = u.failed + 1, locked = failed >= pol.lock;
     await db().update(schema.users).set({ failed, status: locked ? "Locked" : u.status }).where(eq(schema.users.id, u.id));
     if (locked) await log("System", `Locked login ${u.login} after ${failed} wrong passwords`);
@@ -45,6 +49,7 @@ export async function logout() {
 export async function setPassword(fd: FormData) {
   const u = await getUser();
   if (!u) redirect("/login");
+  if (DEMO) { await db().update(schema.users).set({ mustChange: false }).where(eq(schema.users.id, u.id)); redirect(q("/", "ok", DEMO_PW)); }
   const { pol } = await getSettings();
   const n = String(fd.get("new") ?? ""), c = String(fd.get("confirm") ?? "");
   const same = await checkPassword(n, u.passwordHash);
@@ -59,6 +64,7 @@ export async function changePassword(fd: FormData) {
   const u = await getUser();
   if (!u) redirect("/login");
   const { pol } = await getSettings();
+  if (DEMO) redirect(q("/profile", "err", DEMO_PW));
   const o = String(fd.get("current") ?? ""), n = String(fd.get("new") ?? ""), c = String(fd.get("confirm") ?? "");
   if (!(await checkPassword(o, u.passwordHash))) redirect(q("/profile", "err", "Current password is incorrect."));
   const err = pwError(n, pol, o) || (n !== c ? "The two new passwords do not match." : "");
@@ -69,7 +75,7 @@ export async function changePassword(fd: FormData) {
 }
 
 export async function runSetup(fd: FormData) {
-  if (await isSetUp()) redirect("/login");
+  if (DEMO || (await isSetUp())) redirect("/login");
   const key = process.env.SETUP_KEY || "";
   const given = s(fd, "key");
   const match = key.length >= 8 && given.length === key.length && timingSafeEqual(Buffer.from(given), Buffer.from(key));

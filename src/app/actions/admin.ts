@@ -8,6 +8,9 @@ import { getSettings, saveSetting, getMasters } from "@/lib/settings";
 import { APPROVERS, PERM_KEYS, ROLE_KEYS, ROLES, WEEKOFF_OPTIONS, masterDef, type Access, type Role } from "@/lib/config";
 import { isDate, isTime } from "@/lib/dates";
 import { log } from "@/lib/audit";
+import { DEMO, isShowcase } from "@/lib/demo";
+
+const SHOWCASE = "This is one of the demo accounts on the sign-in page, so it can't be changed in the demo.";
 
 const go = (path: string, k: "ok" | "err", m: string): never => redirect(`${path}${path.includes("?") ? "&" : "?"}${k}=${encodeURIComponent(m)}`);
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
@@ -58,6 +61,7 @@ export async function saveAccess(fd: FormData) {
 }
 export async function savePolicy(fd: FormData) {
   const u = await requireAdmin();
+  if (DEMO) go("/admin/users", "err", "The password policy is fixed in the demo so the demo accounts keep working.");
   const pol = { min: Math.min(32, Math.max(6, Number(s(fd, "min")) || 8)), complex: s(fd, "complex") === "yes", expiry: [0, 60, 90, 180].includes(Number(s(fd, "expiry"))) ? Number(s(fd, "expiry")) : 0, lock: [3, 5, 10].includes(Number(s(fd, "lock"))) ? Number(s(fd, "lock")) : 5, session: [4, 8, 12, 24].includes(Number(s(fd, "session"))) ? Number(s(fd, "session")) : 12 };
   await saveSetting("pol", pol);
   await log(who(u), `Password policy: min ${pol.min}, complexity ${pol.complex ? "on" : "off"}, expiry ${pol.expiry || "never"}, lock after ${pol.lock}, session ${pol.session} h`);
@@ -132,6 +136,7 @@ export async function resetPassword(_: TempState, fd: FormData): Promise<TempSta
   const id = Number(fd.get("id"));
   const t = (await db().select().from(schema.users).where(eq(schema.users.id, id)))[0];
   if (!t) return { err: "Login not found." };
+  if (isShowcase(t.login)) return { err: SHOWCASE };
   if (t.id === u.id) return { err: "Change your own password from Profile & password." };
   const pw = tempPassword();
   await db().update(schema.users).set({ passwordHash: await hashPassword(pw), mustChange: true, failed: 0, status: t.status === "Locked" ? "Active" : t.status }).where(eq(schema.users.id, id));
@@ -162,6 +167,7 @@ export async function userAction(fd: FormData) {
   const back = `/admin/users?q=${encodeURIComponent(s(fd, "q"))}`;
   if (!t) go(back, "err", "Login not found.");
   if (t!.id === u.id) go(back, "err", "You cannot change your own login here.");
+  if (isShowcase(t!.login)) go(back, "err", SHOWCASE);
   if (act === "unlock") await db().update(schema.users).set({ status: "Active", failed: 0 }).where(eq(schema.users.id, id));
   else if (act === "disable") { await db().update(schema.users).set({ status: "Disabled" }).where(eq(schema.users.id, id)); await db().delete(schema.sessions).where(eq(schema.sessions.userId, id)); }
   else if (act === "enable") await db().update(schema.users).set({ status: "Active", failed: 0 }).where(eq(schema.users.id, id));
@@ -178,6 +184,7 @@ export async function userAction(fd: FormData) {
 /* ---------------- licence ---------------- */
 export async function saveLicence(fd: FormData) {
   const u = await requireAdmin();
+  if (DEMO) go("/admin/licence", "err", "The licence can't be changed in the demo.");
   const { readKey } = await import("@/lib/license");
   const key = s(fd, "key").replace(/\s+/g, "");
   const { lic, err } = readKey(key);
@@ -189,6 +196,7 @@ export async function saveLicence(fd: FormData) {
 }
 export async function removeLicence() {
   const u = await requireAdmin();
+  if (DEMO) go("/admin/licence", "err", "The licence can't be changed in the demo.");
   await db().delete(schema.settings).where(eq(schema.settings.key, "licence"));
   await log(who(u), "Removed the stored licence key");
   go("/admin/licence", "ok", "Licence key removed.");

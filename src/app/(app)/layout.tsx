@@ -9,6 +9,9 @@ import Nav, { type NavItem } from "@/components/Nav";
 import { Mark } from "@/components/ui";
 import Powered from "@/components/Powered";
 import { licenceStatus } from "@/lib/license";
+import { DEMO, DEMO_RESET_TIME } from "@/lib/demo";
+import { resetDemo } from "@/app/actions/demo";
+import { Confirm } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -60,7 +63,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </header>
       <div className="shell">
         <Nav items={items} />
-        <main>{banner && <div className="msg err" role="status">{banner}{u.role === "admin" && <> <a href="/admin/licence" style={{ color: "inherit", fontWeight: 600 }}>Manage licence</a></>}</div>}{children}<footer style={{ marginTop: 24, paddingTop: 12, borderTop: "1px solid var(--line)" }}><Powered /></footer></main>
+        <main>{DEMO && <div className="admin-note row between" role="status"><span><b>Demo with sample data.</b> Explore freely; everything you change is wiped every night at {DEMO_RESET_TIME}.</span>{u.role === "admin" && <Confirm label="Reset demo data now" confirm="Reset all demo data" action={resetDemo} danger={false} />}</div>}{!DEMO && banner && <div className="msg err" role="status">{banner}{u.role === "admin" && <> <a href="/admin/licence" style={{ color: "inherit", fontWeight: 600 }}>Manage licence</a></>}</div>}{children}<footer style={{ marginTop: 24, paddingTop: 12, borderTop: "1px solid var(--line)" }}><Powered /></footer></main>
       </div>
     </>
   );

@@ -9,6 +9,7 @@ import { EMP_STATUS } from "@/lib/config";
 import { isDate, monthLabel } from "@/lib/dates";
 import { log } from "@/lib/audit";
 import { employeeRoom } from "@/lib/license";
+import { isShowcase } from "@/lib/demo";
 
 const go = (path: string, k: "ok" | "err", m: string): never => redirect(`${path}${path.includes("?") ? "&" : "?"}${k}=${encodeURIComponent(m)}`);
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
@@ -28,6 +29,7 @@ export async function saveEmployee(fd: FormData) {
   if (!(await activeList("dept")).includes(v.department)) go(back, "err", "Pick a department from the list.");
   if (!(await activeList("cat")).includes(v.category)) go(back, "err", "Pick a category from the list.");
   if (v.doj && !isDate(v.doj)) go(back, "err", "Date of joining is not valid.");
+  if (isShowcase(id) && v.status === "Exited") go(back, "err", "This person's login is one of the demo accounts, so they can't be marked as exited in the demo.");
   if (!EMP_STATUS.includes(v.status)) go(back, "err", "Pick a valid status.");
   if (isNew) {
     const ex = await db().select({ id: schema.employees.id }).from(schema.employees).where(eq(schema.employees.id, id));

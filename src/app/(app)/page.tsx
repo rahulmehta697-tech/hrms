@@ -25,7 +25,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   const hour = Number(nowIn(org.tz).time.slice(0, 2));
   return (
     <>
-      <Head title={`Good ${hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening"}, ${emp.name.split(" ").slice(0, 2).join(" ")}`} sub={<>{emp.designation} · {emp.department} · <span className="mono">{org.prefix}-{emp.id}</span></>}>
+      <Head title={`Good ${hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening"}, ${/^dr\.?\s/i.test(emp.name) ? "Dr. " + emp.name.split(" ").at(-1) : emp.name.split(" ")[0]}`} sub={<>{emp.designation} · {emp.department} · <span className="mono">{org.prefix}-{emp.id}</span></>}>
         <a className="btn primary" href="/leave">Apply leave</a>
       </Head>
       <Flash sp={sp} />
